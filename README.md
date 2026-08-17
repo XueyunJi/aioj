@@ -1,3 +1,16 @@
+原项目作者：Mubai0628
+- 当前维护者：XueyunJi
+- 维护起始时间：2026年8月
+
+### 当前状态
+- 代码已备份并迁移至本仓库
+- AI 出题模块问题已识别，修复方案已规划
+- 项目持续迭代中
+
+### 相关文档
+- [系统架构白皮书](docs/系统架构白皮书_v1.0.md)
+- [AI出题问题分析](docs/AI出题问题分析.md)
+
 # AIOJ
 
 [中文](#中文) · [English](#english) · [中文设计文档](docs/zh/README.md) · [English design docs](docs/en/README.md)
