@@ -11,7 +11,7 @@
 ### 相关文档
 - [系统架构白皮书](docs/系统架构白皮书_v1.0.md)
 - [AI出题问题分析](docs/AI出题问题分析.md)
-- [语义检索能力报告](docs/AI-OJ平台Embedding语义检索能力调研与部署报告.md
+- [语义检索能力报告](docs/AI-OJ平台Embedding语义检索能力调研与部署报告.md)
 # AIOJ
 
 [中文](#中文) · [English](#english) · [中文设计文档](docs/zh/README.md) · [English design docs](docs/en/README.md)
