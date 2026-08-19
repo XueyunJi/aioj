@@ -250,7 +250,7 @@ docker compose -f compose.production.yml --env-file env/app.env --env-file deplo
 | Embedding 模型 | `text-embedding-v3` |
 | Embedding 维度 | 1024 |
 | Base URL | `https://dashscope.aliyuncs.com/compatible-mode/v1/embeddings` |
-| API Key | `sk-0a51763d267a4474bffc3add681c21fd`（百炼） |
+| API Key | `sk-0000000000000000000000000000000000000(百炼apikey) |
 | 功能开关 | `AI_EMBEDDING_ENABLED=true` |
 | 向量表 | `ai_retrieval_chunks`（1477 条，无题目） |
 | 前端版本 | React 19（已部署） |
