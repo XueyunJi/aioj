@@ -34,7 +34,7 @@ public class AiModelCompletionClient {
     }
 
     public AiModelCompletionClient(ObjectMapper objectMapper) {
-        this(objectMapper, new AiProperties());
+        this(objectMapper, AiHttpClients.create(new AiProperties()));
     }
 
     public CompletionResult complete(AiModelEffectiveConfig config, List<Map<String, String>> messages,

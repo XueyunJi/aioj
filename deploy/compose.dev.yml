@@ -1,0 +1,82 @@
+name: ai-oj-next-dev
+
+# Local development dependencies only.
+# Java services run from the host via Maven/IDE and therefore do not belong here.
+services:
+  mysql:
+    image: mysql:8.4
+    command: --innodb-buffer-pool-size=256M --max-connections=50
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-ai_oj_next}
+      MYSQL_USER: ${MYSQL_USER:-aioj}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-change-me}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-change-root-me}
+    ports:
+      - "127.0.0.1:3306:3306"
+    volumes:
+      - ai-oj-next-dev-mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7.4-alpine
+    command: sh -c 'redis-server --appendonly yes --requirepass "$${REDIS_PASSWORD}" --maxmemory 64mb --maxmemory-policy allkeys-lru'
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-change-redis-me}
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - ai-oj-next-dev-redis-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a $${REDIS_PASSWORD} ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-aioj}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-change-rabbit-me}
+    ports:
+      - "127.0.0.1:5672:5672"
+      - "127.0.0.1:15672:15672"
+    volumes:
+      - ai-oj-next-dev-rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  sandbox:
+    build:
+      context: ../sandbox
+    privileged: true
+    shm_size: 256m
+    environment:
+      ES_HTTP_ADDR: ":8090"
+      ES_AUTH_TOKEN: ${SANDBOX_TOKEN:-}
+      ES_OUTPUT_LIMIT: ${SANDBOX_OUTPUT_LIMIT:-33554432}
+      ES_COPY_OUT_LIMIT: ${SANDBOX_COPY_OUT_LIMIT:-16777216}
+      ES_FILE_TIMEOUT: ${SANDBOX_FILE_TIMEOUT:-10m}
+    ports:
+      - "127.0.0.1:8090:8090"
+    volumes:
+      - ai-oj-next-dev-testcase-cache:/aioj/cases
+      - ai-oj-next-dev-sandbox-tmp:/tmp
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8090/version >/dev/null"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  ai-oj-next-dev-mysql-data:
+  ai-oj-next-dev-redis-data:
+  ai-oj-next-dev-rabbitmq-data:
+  ai-oj-next-dev-testcase-cache:
+  ai-oj-next-dev-sandbox-tmp:
