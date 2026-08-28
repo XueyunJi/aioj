@@ -230,7 +230,7 @@ function isRegenerationJob(job: ProblemDraftGenerationJobResponse) {
 
 function jobNote(job: ProblemDraftGenerationJobResponse, t: TFunction) {
   if (job.status === "FAILED") {
-    return job.errorMessage || t("draftJobs.errorFallback");
+    return friendlyDraftGenerationError(job.errorMessage, t);
   }
   if (job.status === "SUCCEEDED" && job.draftId) {
     if (isRegenerationJob(job)) {
@@ -242,6 +242,20 @@ function jobNote(job: ProblemDraftGenerationJobResponse, t: TFunction) {
     return t("draftJobs.draftCreated", { id: shortId(job.draftId) });
   }
   return jobStageNote(job.stage, t);
+}
+
+function friendlyDraftGenerationError(message: string | null | undefined, t: TFunction) {
+  const raw = message?.trim() || "";
+  if (/constraints are required for cfRating >= 1700/i.test(raw)) {
+    return "题目规划未生成有效数据范围，系统未要求你预先填写；请点击重新生成，系统将根据算法和评分自动推导约束。";
+  }
+  if (/expectedTimeComplexity is required for cfRating >= 1700|generationPlan should include the claimed time complexity/i.test(raw)) {
+    return "高评分题缺少复杂度声明，系统将要求 AI 自动补齐 generationPlan 后再验证。";
+  }
+  if (/Error while extracting response for type \[java\.lang\.String\]/i.test(raw)) {
+    return "AI 返回格式暂未能解析，请稍后重试。";
+  }
+  return raw || t("draftJobs.errorFallback");
 }
 
 function progressLabel(job: ProblemDraftGenerationJobResponse, t: TFunction) {

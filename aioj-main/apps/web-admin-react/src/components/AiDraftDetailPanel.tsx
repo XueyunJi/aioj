@@ -8,6 +8,14 @@ import { useToast } from "../lib/toast";
 import { difficultyTone, formatBytes, formatDateTime, shortId } from "../lib/format";
 import { readableCaughtError } from "../lib/readableError";
 
+function isHighRatingDraft(draft: { difficulty?: string | null }) {
+  return draft.difficulty === "HARD" || draft.difficulty === "CHALLENGE";
+}
+
+function hasClaimedTimeComplexity(plan: string | null | undefined) {
+  return /(?:time|时间)\s*complexity|(?:expectedTimeComplexity|期望时间复杂度)\s*[:：]/i.test(plan || "");
+}
+
 const DIFFICULTIES: Difficulty[] = ["EASY", "MEDIUM", "HARD", "CHALLENGE"];
 
 type DraftTab = "preview" | "verification" | "edit" | "regenerate";
@@ -305,6 +313,9 @@ export function AiDraftDetailPanel({
               <section className="rounded-xl border border-[var(--oj-border)] bg-white p-4">
                 <h3 className="mb-3 text-sm font-semibold text-[var(--oj-ink)]">{t("drafts.generationPlan")}</h3>
                 {currentDraft.generationPlan ? <p className="whitespace-pre-wrap text-sm leading-6 text-[var(--oj-ink)]">{currentDraft.generationPlan}</p> : <p className="text-sm text-[var(--oj-ink-muted)]">{t("drafts.generationPlanEmpty")}</p>}
+                {isHighRatingDraft(currentDraft) && !hasClaimedTimeComplexity(currentDraft.generationPlan) && (
+                  <p className="mt-2 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">高评分题缺少时间复杂度声明，请补充后再提交审核。</p>
+                )}
               </section>
               <CasesPreview cases={currentDraft.testCases ?? []} />
             </div>
@@ -544,6 +555,7 @@ function VerificationReportPanel({ draft }: { draft: ProblemDraftResponse }) {
       {parsed?.sandboxReport ? <SandboxReportPanels block={parsed.sandboxReport} /> : null}
       {parsed?.crossCheckReport ? <CrossCheckReportPanel block={parsed.crossCheckReport} /> : null}
       {parsed?.complexityReport ? <ComplexityReportPanel block={parsed.complexityReport} /> : null}
+      <TestcaseArtifactPanel draftId={draft.id} />
 
       {draft.verificationReportJson ? (
         <section className="rounded-xl border border-[var(--oj-border)] bg-white p-4">
@@ -555,6 +567,33 @@ function VerificationReportPanel({ draft }: { draft: ProblemDraftResponse }) {
       ) : null}
     </div>
   );
+}
+
+function TestcaseArtifactPanel({ draftId }: { draftId: string }) {
+  const [artifact, setArtifact] = React.useState<any>(null);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  async function load() {
+    setLoading(true); setError(null);
+    try { setArtifact(await api.problemDraftTestcaseArtifact(draftId)); }
+    catch (e) { setError(e instanceof Error ? e.message : "测试包尚未生成"); }
+    finally { setLoading(false); }
+  }
+  React.useEffect(() => { void load(); }, [draftId]);
+  async function download() {
+    const file = await api.downloadProblemDraftTestcaseArtifact(draftId);
+    const url = URL.createObjectURL(file.blob); const anchor = document.createElement("a");
+    anchor.href = url; anchor.download = file.fileName; anchor.click(); URL.revokeObjectURL(url);
+  }
+  return <section className="rounded-xl border border-[var(--oj-border)] bg-white p-4">
+    <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="text-sm font-semibold text-[var(--oj-ink)]">官方测试包</h3>
+      {artifact ? <Button size="sm" variant="outline" onClick={() => void download()}>下载 ZIP</Button> : null}</div>
+    {loading ? <p className="mt-3 text-sm text-[var(--oj-ink-muted)]">加载中...</p> : null}
+    {error && !artifact ? <p className="mt-3 text-sm text-[var(--oj-ink-muted)]">{error}</p> : null}
+    {artifact ? <><p className="mt-3 text-sm text-[var(--oj-ink-muted)]">{artifact.fileName} · {artifact.caseCount} 个测试点 · SHA-256 {artifact.sha256}</p>
+      <div className="mt-3 max-h-80 space-y-2 overflow-auto">{artifact.entries.map((entry: any) => <details key={entry.name} className="rounded border border-[var(--oj-border-soft)] p-2"><summary className="cursor-pointer text-xs">{entry.name} ({entry.sizeBytes ?? "?"} bytes)</summary><pre className="mt-2 max-h-32 overflow-auto whitespace-pre-wrap bg-slate-50 p-2 text-xs">{entry.preview}{entry.truncated ? "\n... 已截断" : ""}</pre></details>)}</div>
+    </> : null}
+  </section>;
 }
 
 function ManualReviewPanel({ block }: { block: ManualReviewBlock }) {

@@ -12,6 +12,8 @@ import com.aioj.next.ai.domain.AiQuotaService;
 import com.aioj.next.ai.domain.AccountImportParseService;
 import com.aioj.next.ai.domain.ProblemDraftGenerationJobService;
 import com.aioj.next.ai.domain.ProblemDraftStore;
+import com.aioj.next.ai.domain.ProblemDraftTestcaseArtifactService;
+import com.aioj.next.ai.persistence.entity.ProblemDraftTestcaseArtifactEntity;
 import com.aioj.next.ai.domain.memory.AiMemoryCandidateService;
 import com.aioj.next.ai.domain.memory.AiMemoryDebugService;
 import com.aioj.next.ai.domain.memory.AiMemoryReviewService;
@@ -67,6 +69,8 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.core.io.InputStreamResource;
+import org.springframework.http.ContentDisposition;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -81,6 +85,8 @@ import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBo
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -110,6 +116,7 @@ public class AiController {
     private final AiMemoryDebugService aiMemoryDebugService;
     private final AiMemoryReviewService aiMemoryReviewService;
     private final ProblemDraftStore problemDraftStore;
+    private ProblemDraftTestcaseArtifactService testcaseArtifactService;
     private final AiAssistantResponseNormalizer responseNormalizer;
     private final ObjectMapper objectMapper;
     private final Executor problemDraftExecutor;
@@ -136,7 +143,8 @@ public class AiController {
     ) {
         this(aiProvider, agentChatFacade, aiQuotaService, accountImportParseService, aiConversationService,
                 aiContextService, aiMemoryService, aiLearningProfileService, aiMemoryCandidateService,
-                aiMemoryDebugService, aiMemoryReviewService, problemDraftStore, responseNormalizer, objectMapper,
+                aiMemoryDebugService, aiMemoryReviewService, problemDraftStore,
+                responseNormalizer, objectMapper,
                 Runnable::run);
     }
 
@@ -173,6 +181,11 @@ public class AiController {
         this.responseNormalizer = responseNormalizer;
         this.objectMapper = objectMapper;
         this.problemDraftExecutor = problemDraftExecutor;
+    }
+
+    @Autowired
+    public void setTestcaseArtifactService(ProblemDraftTestcaseArtifactService service) {
+        this.testcaseArtifactService = service;
     }
 
     @Autowired(required = false)
@@ -583,6 +596,54 @@ public class AiController {
     @PreAuthorize("hasAnyRole('TEACHER','ADMIN')")
     public ApiResponse<ProblemDraftResponse> draft(@PathVariable Long id) {
         return ApiResponse.ok(problemDraftStore.get(id));
+    }
+
+    @GetMapping("/admin/problem-drafts/{id}/testcase-artifacts/latest")
+    @PreAuthorize("hasAnyRole('TEACHER','ADMIN')")
+    public ApiResponse<Map<String, Object>> latestTestcaseArtifact(@PathVariable Long id) {
+        problemDraftStore.get(id);
+        ProblemDraftTestcaseArtifactEntity artifact = testcaseArtifactService.latestReady(id);
+        if (artifact == null) {
+            throw new DomainException(ErrorCode.NOT_FOUND, "Verified testcase package is not available");
+        }
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("id", artifact.getId());
+        response.put("draftId", artifact.getDraftId());
+        response.put("status", artifact.getStatus());
+        response.put("fileName", artifact.getFileName());
+        response.put("fileSizeBytes", artifact.getFileSizeBytes());
+        response.put("sha256", artifact.getSha256());
+        response.put("caseCount", artifact.getCaseCount());
+        response.put("totalInputBytes", artifact.getTotalInputBytes());
+        response.put("totalOutputBytes", artifact.getTotalOutputBytes());
+        response.put("largestCaseBytes", artifact.getLargestCaseBytes());
+        response.put("createdAt", artifact.getCreatedAt());
+        response.put("entries", testcaseArtifactService.previewEntries(id));
+        return ApiResponse.ok(response);
+    }
+
+    @GetMapping("/admin/problem-drafts/{id}/testcase-artifacts/latest/download")
+    @PreAuthorize("hasAnyRole('TEACHER','ADMIN')")
+    public ResponseEntity<InputStreamResource> downloadLatestTestcaseArtifact(@PathVariable Long id) {
+        problemDraftStore.get(id);
+        ProblemDraftTestcaseArtifactEntity artifact = testcaseArtifactService.latestReady(id);
+        if (artifact == null) {
+            throw new DomainException(ErrorCode.NOT_FOUND, "Verified testcase package is not available");
+        }
+        Path path = testcaseArtifactService.resolvePath(artifact);
+        try {
+            return ResponseEntity.ok()
+                    .contentType(MediaType.parseMediaType("application/zip"))
+                    .contentLength(Files.size(path))
+                    .header(HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS,
+                            String.join(", ", HttpHeaders.CONTENT_DISPOSITION, HttpHeaders.CONTENT_LENGTH,
+                                    HttpHeaders.CONTENT_TYPE))
+                    .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
+                            .filename(artifact.getFileName(), StandardCharsets.UTF_8).build().toString())
+                    .body(new InputStreamResource(Files.newInputStream(path)));
+        } catch (IOException ex) {
+            throw new DomainException(ErrorCode.INTERNAL_ERROR, "Failed to open verified testcase package");
+        }
     }
 
     @PostMapping("/admin/problem-drafts/{id}/refine")

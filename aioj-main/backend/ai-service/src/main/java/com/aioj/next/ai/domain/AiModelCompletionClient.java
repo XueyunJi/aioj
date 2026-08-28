@@ -70,15 +70,14 @@ public class AiModelCompletionClient {
                                       boolean allowThinkingRetry, JsonNode jsonSchema) {
         Map<String, Object> body = completionBody(messages, temperature, maxTokens, config, jsonOutput, jsonSchema);
         try {
-            String response = restClient.post()
+            JsonNode root = restClient.post()
                     .uri(config.baseUrl())
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + config.apiKey())
                     .contentType(MediaType.APPLICATION_JSON)
                     .accept(MediaType.APPLICATION_JSON)
                     .body(body)
                     .retrieve()
-                    .body(String.class);
-            JsonNode root = objectMapper.readTree(response);
+                    .body(JsonNode.class);
             String content = visibleAssistantContent(root);
             if (content == null || content.isBlank()) {
                 if (allowThinkingRetry && shouldRetryWithoutThinking(config)) {
@@ -141,15 +140,14 @@ public class AiModelCompletionClient {
             body.put("dimensions", config.embeddingDimension());
         }
         try {
-            String response = restClient.post()
+            JsonNode root = restClient.post()
                     .uri(normalizeEmbeddingUrl(config.baseUrl()))
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + config.apiKey())
                     .contentType(MediaType.APPLICATION_JSON)
                     .accept(MediaType.APPLICATION_JSON)
                     .body(body)
                     .retrieve()
-                    .body(String.class);
-            JsonNode root = objectMapper.readTree(response);
+                    .body(JsonNode.class);
             JsonNode vector = root.path("data").path(0).path("embedding");
             if (!vector.isArray() || vector.isEmpty()) {
                 throw new DomainException(ErrorCode.INTERNAL_ERROR, "AI provider returned no embedding vector");

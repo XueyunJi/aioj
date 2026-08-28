@@ -2328,6 +2328,21 @@ export interface ProblemDraftResponse {
   lastRepairReason?: string | null;
 }
 
+export interface ProblemDraftTestcaseArtifactPreview {
+  id: EntityId;
+  draftId: EntityId;
+  status: string;
+  fileName: string;
+  fileSizeBytes: number;
+  sha256: string;
+  caseCount: number;
+  totalInputBytes: number;
+  totalOutputBytes: number;
+  largestCaseBytes: number;
+  createdAt: string;
+  entries: Array<{ name: string; sizeBytes: number | null; preview: string; truncated: boolean }>;
+}
+
 export interface ProblemDraftRefinePayload {
   title?: string;
   difficulty?: string;
@@ -3729,6 +3744,10 @@ export const api = {
     request<PageResponse<ProblemDraftResponse>>(`/api/v1/admin/problem-drafts${queryString({ page: 1, pageSize: 20, ...params })}`),
   problemDraft: (id: EntityId) =>
     request<ProblemDraftResponse>(`/api/v1/admin/problem-drafts/${id}`),
+  problemDraftTestcaseArtifact: (id: EntityId) =>
+    request<ProblemDraftTestcaseArtifactPreview>(`/api/v1/admin/problem-drafts/${id}/testcase-artifacts/latest`),
+  downloadProblemDraftTestcaseArtifact: (id: EntityId) =>
+    requestBinary(`/api/v1/admin/problem-drafts/${id}/testcase-artifacts/latest/download`, {}, 'official-hidden-testcases.zip'),
   refineDraft: (id: EntityId, payload: ProblemDraftRefinePayload) =>
     request<ProblemDraftResponse>(`/api/v1/admin/problem-drafts/${id}/refine`, {
       method: 'POST',

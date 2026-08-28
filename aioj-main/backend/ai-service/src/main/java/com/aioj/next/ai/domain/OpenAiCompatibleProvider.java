@@ -1589,6 +1589,7 @@ public class OpenAiCompatibleProvider implements AiProvider {
                 %s
                 如果分阶段材料互相冲突，选择能让题面、标程、公开样例、官方隐藏输入和标程物化输出完全一致的一版，并补齐所有必填字段。
                 generationPlan 必须写教师审查用的边界、复杂度、测试策略和生成依据，并保留 planning JSON 中的核心算法、辅助算法、核心观察、estimatedCfRating、constraints、expectedTimeComplexity、boundaryCases、commonWrongApproaches 与 fitCheck 摘要。
+                当 Codeforces rating >= 1700 时，generationPlan 中必须明确出现一行“期望时间复杂度：...”或“时间复杂度：...”，并填写 planning JSON 的 expectedTimeComplexity 原文；同时明确写出空间复杂度。不得省略、留空或使用“较优”“高效”等模糊表述。即使 statement 禁止出现复杂度，generationPlan 仍必须保留复杂度声明。
                 不要输出 JSON 外文本。
                 <PLAN>%s</PLAN>
                 <TEST_DATA>%s</TEST_DATA>

@@ -24,6 +24,12 @@ import java.security.MessageDigest;
 import java.time.LocalDateTime;
 import java.util.HexFormat;
 import java.util.Locale;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 @Service
 public class ProblemDraftTestcaseArtifactService {
@@ -131,6 +137,35 @@ public class ProblemDraftTestcaseArtifactService {
             throw new DomainException(ErrorCode.NOT_FOUND, "Problem draft testcase artifact file is missing");
         }
         return path;
+    }
+
+    public List<Map<String, Object>> previewEntries(Long draftId) {
+        ProblemDraftTestcaseArtifactEntity artifact = latestReady(draftId);
+        if (artifact == null) {
+            return List.of();
+        }
+        Path path = resolvePath(artifact);
+        List<Map<String, Object>> entries = new ArrayList<>();
+        try (ZipInputStream zip = new ZipInputStream(Files.newInputStream(path))) {
+            ZipEntry entry;
+            while ((entry = zip.getNextEntry()) != null && entries.size() < 100) {
+                if (entry.isDirectory()) continue;
+                Map<String, Object> item = new LinkedHashMap<>();
+                item.put("name", entry.getName());
+                item.put("sizeBytes", entry.getSize());
+                item.put("preview", readPreview(zip, 8192));
+                item.put("truncated", entry.getSize() < 0 || entry.getSize() > 8192);
+                entries.add(item);
+            }
+            return entries;
+        } catch (IOException ex) {
+            throw new DomainException(ErrorCode.INTERNAL_ERROR, "Failed to preview testcase package");
+        }
+    }
+
+    private String readPreview(InputStream input, int maxBytes) throws IOException {
+        byte[] buffer = input.readNBytes(maxBytes + 1);
+        return new String(buffer, 0, Math.min(buffer.length, maxBytes), java.nio.charset.StandardCharsets.UTF_8);
     }
 
     public void markImported(Long artifactId, Long problemId, Long testcasePackageId) {
