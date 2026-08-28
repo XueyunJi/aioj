@@ -1,0 +1,20 @@
+title = "AIOJ Gitleaks configuration"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Known synthetic redaction fixtures and PEM parser literals in exact source files"
+condition = "AND"
+regexTarget = "line"
+paths = [
+  '''^backend/ai-service/src/test/java/com/aioj/next/ai/domain/AiRetrievalServiceTest\.java$''',
+  '''^backend/ai-service/src/test/java/com/aioj/next/ai/domain/context/AiContextReportBuilderTest\.java$''',
+  '''^backend/ai-service/src/test/java/com/aioj/next/ai/domain/context/AiConversationContextV2ServiceTest\.java$''',
+  '''^backend/common-lib/src/main/java/com/aioj/next/common/security/JwtTokenService\.java$''',
+]
+regexes = [
+  '''plain-secret-123''',
+  '''sk-live-secret-123''',
+  '''\.replace\("-----BEGIN PRIVATE KEY-----", ""\)''',
+]

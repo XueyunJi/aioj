@@ -1,0 +1,405 @@
+name: aioj
+
+x-logging: &bounded-logging
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "3"
+
+x-backend-health: &backend-health
+  interval: 10s
+  timeout: 5s
+  retries: 18
+  start_period: 20s
+
+services:
+  mysql:
+    image: mysql:8.4@sha256:1d6b6a8fcee8ff758ff151d017f5203cd06792a0e698f0a593c9dfcb14609cf0
+    restart: unless-stopped
+    command: --innodb-buffer-pool-size=768M --max-connections=100
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:?MYSQL_DATABASE is required}
+      MYSQL_USER: ${MYSQL_USER:?MYSQL_USER is required}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD is required}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required}
+    ports:
+      - "${MYSQL_BIND_ADDRESS:-127.0.0.1}:3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks: [app-net]
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$${MYSQL_ROOT_PASSWORD} --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    mem_limit: 1280m
+    cpus: "1.00"
+    logging: *bounded-logging
+
+  redis:
+    image: redis:7.4-alpine@sha256:9702d01c1f10c3ea9f48211b4362e44f154ff02d063e6f7268eba804059f53bf
+    restart: unless-stopped
+    command: sh -c 'redis-server --appendonly yes --requirepass "$${REDIS_PASSWORD}" --maxmemory 96mb --maxmemory-policy allkeys-lru'
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis-data:/data
+    networks: [app-net]
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a $${REDIS_PASSWORD} ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    mem_limit: 192m
+    cpus: "0.25"
+    logging: *bounded-logging
+
+  rabbitmq:
+    image: rabbitmq:3.13-management@sha256:9cfb7e92ae7d296aec4d1ae799e431209f7ed57d55f9c929d95667d0ccf1c920
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:?RABBITMQ_DEFAULT_USER is required}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:?RABBITMQ_DEFAULT_PASS is required}
+    ports:
+      - "127.0.0.1:5672:5672"
+      - "127.0.0.1:15672:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    networks: [app-net]
+    healthcheck:
+      test: ["CMD", "gosu", "rabbitmq", "rabbitmq-diagnostics", "-q", "check_running"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 20s
+    mem_limit: 512m
+    cpus: "0.50"
+    logging: *bounded-logging
+
+  auth-service:
+    image: ${AUTH_IMAGE:?AUTH_IMAGE must be an immutable GHCR digest}
+    restart: unless-stopped
+    environment:
+      SERVER_PORT: 8201
+      JAVA_OPTS: ${AUTH_JAVA_OPTS:--XX:InitialRAMPercentage=15 -XX:MaxRAMPercentage=55 -XX:+ExitOnOutOfMemoryError}
+      MYSQL_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      AUTH_DB_POOL_MAX: ${AUTH_DB_POOL_MAX:-8}
+      AUTH_DB_POOL_MIN_IDLE: ${AUTH_DB_POOL_MIN_IDLE:-2}
+      DB_CONNECTION_TIMEOUT_MS: ${DB_CONNECTION_TIMEOUT_MS:-5000}
+      FLYWAY_ENABLED: "true"
+      NACOS_ENABLED: "false"
+      AUTH_REGISTRATION_ENABLED: ${AUTH_REGISTRATION_ENABLED:-false}
+      AUTH_LOGIN_MAX_FAILURES: ${AUTH_LOGIN_MAX_FAILURES:-5}
+      AUTH_LOGIN_WINDOW: ${AUTH_LOGIN_WINDOW:-PT15M}
+      AUTH_LOGIN_LOCK_DURATION: ${AUTH_LOGIN_LOCK_DURATION:-PT15M}
+      JWT_ISSUER: ${JWT_ISSUER:-aioj}
+      JWT_HMAC_SECRET: ${JWT_HMAC_SECRET:?JWT_HMAC_SECRET is required}
+      JWT_PRIVATE_KEY_PEM: ${JWT_PRIVATE_KEY_PEM:-}
+      JWT_PUBLIC_KEY_PEM: ${JWT_PUBLIC_KEY_PEM:-}
+      JWT_ACCESS_TTL: ${JWT_ACCESS_TTL:-PT2H}
+      JWT_REFRESH_TTL: ${JWT_REFRESH_TTL:-P14D}
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health
+      SPRINGDOC_ENABLED: "false"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks: [app-net]
+    healthcheck:
+      <<: *backend-health
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8201/actuator/health | grep -q '\"status\":\"UP\"'"]
+    mem_limit: 512m
+    cpus: "4.00"
+    logging: *bounded-logging
+
+  problem-service:
+    image: ${PROBLEM_IMAGE:?PROBLEM_IMAGE must be an immutable GHCR digest}
+    restart: unless-stopped
+    environment:
+      SERVER_PORT: 8202
+      JAVA_OPTS: ${PROBLEM_JAVA_OPTS:--XX:InitialRAMPercentage=15 -XX:MaxRAMPercentage=60 -XX:+ExitOnOutOfMemoryError}
+      MYSQL_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      PROBLEM_DB_POOL_MAX: ${PROBLEM_DB_POOL_MAX:-12}
+      PROBLEM_DB_POOL_MIN_IDLE: ${PROBLEM_DB_POOL_MIN_IDLE:-2}
+      DB_CONNECTION_TIMEOUT_MS: ${DB_CONNECTION_TIMEOUT_MS:-5000}
+      REDIS_HOST: redis
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
+      FLYWAY_ENABLED: "false"
+      NACOS_ENABLED: "false"
+      JWT_ISSUER: ${JWT_ISSUER:-aioj}
+      JWT_HMAC_SECRET: ${JWT_HMAC_SECRET}
+      JWT_PRIVATE_KEY_PEM: ${JWT_PRIVATE_KEY_PEM:-}
+      JWT_PUBLIC_KEY_PEM: ${JWT_PUBLIC_KEY_PEM:-}
+      AIOJ_INTERNAL_API_TOKEN: ${AIOJ_INTERNAL_API_TOKEN:?AIOJ_INTERNAL_API_TOKEN is required}
+      AI_SERVICE_URI: http://ai-service:8204
+      AIOJ_TESTCASE_STORAGE_ROOT: /aioj/testcases
+      AIOJ_OPERATION_ARTIFACT_ROOT: /aioj/operation-artifacts
+      AIOJ_OPERATION_LEASE_DURATION: ${AIOJ_OPERATION_LEASE_DURATION:-5m}
+      AIOJ_OPERATION_POLL_MILLIS: ${AIOJ_OPERATION_POLL_MILLIS:-5000}
+      AIOJ_OPERATION_EXECUTOR_POOL_SIZE: ${AIOJ_OPERATION_EXECUTOR_POOL_SIZE:-2}
+      AIOJ_OPERATION_POLL_BATCH_SIZE: ${AIOJ_OPERATION_POLL_BATCH_SIZE:-3}
+      AIOJ_OPERATION_WORKER_ENABLED: ${AIOJ_OPERATION_WORKER_ENABLED:-true}
+      AIOJ_PLAGIARISM_EXECUTOR_POOL_SIZE: ${AIOJ_PLAGIARISM_EXECUTOR_POOL_SIZE:-1}
+      AIOJ_PLAGIARISM_MAX_FRAGMENT_EXCERPT_CHARS: ${AIOJ_PLAGIARISM_MAX_FRAGMENT_EXCERPT_CHARS:-1200}
+      AIOJ_CONTEST_INVITATION_DISPATCH_CONCURRENCY: ${AIOJ_CONTEST_INVITATION_DISPATCH_CONCURRENCY:-2}
+      AIOJ_CONTEST_INVITATION_DISPATCH_BATCH_SIZE: ${AIOJ_CONTEST_INVITATION_DISPATCH_BATCH_SIZE:-25}
+      AIOJ_CONTEST_INVITATION_DISPATCH_POLL_MILLIS: ${AIOJ_CONTEST_INVITATION_DISPATCH_POLL_MILLIS:-5000}
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health
+      SPRINGDOC_ENABLED: "false"
+    volumes:
+      - problem-testcases:/aioj/testcases
+      - operation-artifacts:/aioj/operation-artifacts
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks: [app-net]
+    healthcheck:
+      <<: *backend-health
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8202/actuator/health | grep -q '\"status\":\"UP\"'"]
+    mem_limit: 1024m
+    cpus: "1.25"
+    logging: *bounded-logging
+
+  sandbox:
+    image: ${SANDBOX_IMAGE:?SANDBOX_IMAGE must be an immutable GHCR digest}
+    restart: unless-stopped
+    privileged: true
+    read_only: true
+    shm_size: 256m
+    pids_limit: 512
+    environment:
+      ES_HTTP_ADDR: ":8090"
+      ES_AUTH_TOKEN: ${SANDBOX_TOKEN:?SANDBOX_TOKEN is required}
+      ES_OUTPUT_LIMIT: ${SANDBOX_OUTPUT_LIMIT:-33554432}
+      ES_COPY_OUT_LIMIT: ${SANDBOX_COPY_OUT_LIMIT:-16777216}
+      ES_FILE_TIMEOUT: ${SANDBOX_FILE_TIMEOUT:-10m}
+    volumes:
+      - testcase-cache:/aioj/cases:ro
+      - sandbox-tmp:/tmp
+    networks: [judge-net]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8090/version >/dev/null"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    mem_limit: 1024m
+    cpus: "1.50"
+    logging: *bounded-logging
+
+  judge-worker:
+    image: ${JUDGE_IMAGE:?JUDGE_IMAGE must be an immutable GHCR digest}
+    restart: unless-stopped
+    environment:
+      SERVER_PORT: 8203
+      JAVA_OPTS: ${JUDGE_JAVA_OPTS:--XX:InitialRAMPercentage=15 -XX:MaxRAMPercentage=55 -XX:+ExitOnOutOfMemoryError}
+      MYSQL_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      JUDGE_DB_POOL_MAX: ${JUDGE_DB_POOL_MAX:-4}
+      JUDGE_DB_POOL_MIN_IDLE: ${JUDGE_DB_POOL_MIN_IDLE:-1}
+      DB_CONNECTION_TIMEOUT_MS: ${DB_CONNECTION_TIMEOUT_MS:-5000}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
+      NACOS_ENABLED: "false"
+      AIOJ_JUDGE_CACHE_ROOT: /aioj/cases
+      SANDBOX_ENDPOINT: http://sandbox:8090/execute
+      SANDBOX_TOKEN: ${SANDBOX_TOKEN}
+      AIOJ_INTERNAL_API_TOKEN: ${AIOJ_INTERNAL_API_TOKEN}
+      PROBLEM_SERVICE_BASE_URL: http://problem-service:8202
+      JUDGE_PREFETCH: "1"
+      JUDGE_CONCURRENCY: "1"
+      JUDGE_MAX_CONCURRENCY: "1"
+      JUDGE_STDOUT_BASE_COLLECT_LIMIT_BYTES: ${JUDGE_STDOUT_BASE_COLLECT_LIMIT_BYTES:-65536}
+      JUDGE_STDOUT_EXTRA_COLLECT_BYTES: ${JUDGE_STDOUT_EXTRA_COLLECT_BYTES:-65536}
+      JUDGE_STDOUT_MAX_COLLECT_LIMIT_BYTES: ${JUDGE_STDOUT_MAX_COLLECT_LIMIT_BYTES:-4194304}
+      JUDGE_STDERR_COLLECT_LIMIT_BYTES: ${JUDGE_STDERR_COLLECT_LIMIT_BYTES:-65536}
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health
+    volumes:
+      - testcase-cache:/aioj/cases
+    depends_on:
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      problem-service:
+        condition: service_healthy
+      sandbox:
+        condition: service_healthy
+    networks: [app-net, judge-net]
+    healthcheck:
+      <<: *backend-health
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8203/actuator/health | grep -q '\"status\":\"UP\"'"]
+    mem_limit: 512m
+    cpus: "0.75"
+    logging: *bounded-logging
+
+  ai-service:
+    image: ${AI_IMAGE:?AI_IMAGE must be an immutable GHCR digest}
+    restart: unless-stopped
+    environment:
+      SERVER_PORT: 8204
+      JAVA_OPTS: ${AI_JAVA_OPTS:--XX:InitialRAMPercentage=15 -XX:MaxRAMPercentage=60 -XX:+ExitOnOutOfMemoryError}
+      MYSQL_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      AI_DB_POOL_MAX: ${AI_DB_POOL_MAX:-6}
+      AI_DB_POOL_MIN_IDLE: ${AI_DB_POOL_MIN_IDLE:-1}
+      DB_CONNECTION_TIMEOUT_MS: ${DB_CONNECTION_TIMEOUT_MS:-5000}
+      REDIS_HOST: redis
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      FLYWAY_ENABLED: "false"
+      NACOS_ENABLED: "false"
+      JWT_ISSUER: ${JWT_ISSUER:-aioj}
+      JWT_HMAC_SECRET: ${JWT_HMAC_SECRET}
+      JWT_PRIVATE_KEY_PEM: ${JWT_PRIVATE_KEY_PEM:-}
+      JWT_PUBLIC_KEY_PEM: ${JWT_PUBLIC_KEY_PEM:-}
+      AIOJ_INTERNAL_API_TOKEN: ${AIOJ_INTERNAL_API_TOKEN}
+      PROBLEM_SERVICE_URI: http://problem-service:8202
+      JUDGE_WORKER_URI: http://judge-worker:8203
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com/chat/completions}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-v4-pro}
+      KIMI_API_KEY: ${KIMI_API_KEY:-}
+      KIMI_MODEL: ${KIMI_MODEL:-}
+      MOONSHOT_BASE_URL: ${MOONSHOT_BASE_URL:-https://api.moonshot.cn/v1/chat/completions}
+      DEEPSEEK_THINKING_ENABLED: ${DEEPSEEK_THINKING_ENABLED:-false}
+      DEEPSEEK_REASONING_EFFORT: ${DEEPSEEK_REASONING_EFFORT:-high}
+      AI_HTTP_CONNECT_TIMEOUT_MS: ${AI_HTTP_CONNECT_TIMEOUT_MS:-10000}
+      AI_HTTP_READ_TIMEOUT_MS: ${AI_HTTP_READ_TIMEOUT_MS:-300000}
+      AI_CHAT_CORE_POOL_SIZE: ${AI_CHAT_CORE_POOL_SIZE:-2}
+      AI_CHAT_MAX_POOL_SIZE: ${AI_CHAT_MAX_POOL_SIZE:-4}
+      AI_CHAT_QUEUE_CAPACITY: ${AI_CHAT_QUEUE_CAPACITY:-32}
+      AI_STUDENT_ASSISTANT_CONCURRENCY: ${AI_STUDENT_ASSISTANT_CONCURRENCY:-4}
+      AI_PROBLEM_DRAFT_CONCURRENCY: ${AI_PROBLEM_DRAFT_CONCURRENCY:-1}
+      AI_INTENT_MEMORY_CONCURRENCY: ${AI_INTENT_MEMORY_CONCURRENCY:-2}
+      AI_BATCH_REPORT_CONCURRENCY: ${AI_BATCH_REPORT_CONCURRENCY:-1}
+      AI_INTENT_ENABLED: ${AI_INTENT_ENABLED:-true}
+      DEEPSEEK_INTENT_BASE_URL: ${DEEPSEEK_INTENT_BASE_URL:-https://api.deepseek.com/chat/completions}
+      DEEPSEEK_INTENT_MODEL: ${DEEPSEEK_INTENT_MODEL:-deepseek-v4-pro}
+      AI_EMBEDDING_ENABLED: ${AI_EMBEDDING_ENABLED:-false}
+      AI_EMBEDDING_BASE_URL: ${AI_EMBEDDING_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode/v1/embeddings}
+      AI_EMBEDDING_API_KEY: ${AI_EMBEDDING_API_KEY:-}
+      AI_EMBEDDING_MODEL: ${AI_EMBEDDING_MODEL:-text-embedding-v3}
+      AI_PROBLEM_DRAFT_TESTCASE_ARTIFACT_ROOT: /aioj/ai-draft-artifacts
+      AI_LEGACY_MEMORY_MIGRATION_MODE: "off"
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health
+      SPRINGDOC_ENABLED: "false"
+    volumes:
+      - ai-draft-artifacts:/aioj/ai-draft-artifacts
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      problem-service:
+        condition: service_healthy
+      judge-worker:
+        condition: service_healthy
+    networks: [app-net]
+    healthcheck:
+      <<: *backend-health
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8204/actuator/health | grep -q '\"status\":\"UP\"'"]
+    mem_limit: 768m
+    cpus: "0.75"
+    logging: *bounded-logging
+
+  gateway-service:
+    image: ${GATEWAY_IMAGE:?GATEWAY_IMAGE must be an immutable GHCR digest}
+    restart: unless-stopped
+    environment:
+      SERVER_PORT: 8101
+      JAVA_OPTS: ${GATEWAY_JAVA_OPTS:--XX:InitialRAMPercentage=15 -XX:MaxRAMPercentage=55 -XX:+ExitOnOutOfMemoryError}
+      NACOS_ENABLED: "false"
+      AUTH_SERVICE_URI: http://auth-service:8201
+      PROBLEM_SERVICE_URI: http://problem-service:8202
+      AI_SERVICE_URI: http://ai-service:8204
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:?CORS_ALLOWED_ORIGINS is required}
+      GATEWAY_RESPONSE_TIMEOUT: ${GATEWAY_RESPONSE_TIMEOUT:-240s}
+      AI_GATEWAY_RESPONSE_TIMEOUT_MS: ${AI_GATEWAY_RESPONSE_TIMEOUT_MS:-900000}
+      GATEWAY_CONNECT_TIMEOUT_MS: ${GATEWAY_CONNECT_TIMEOUT_MS:-10000}
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health
+      SPRINGDOC_ENABLED: "false"
+    ports:
+      - "127.0.0.1:${GATEWAY_PORT:-8101}:8101"
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      problem-service:
+        condition: service_healthy
+      ai-service:
+        condition: service_healthy
+    networks: [app-net]
+    healthcheck:
+      <<: *backend-health
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8101/actuator/health | grep -q '\"status\":\"UP\"'"]
+    mem_limit: 384m
+    cpus: "0.50"
+    logging: *bounded-logging
+
+  web-user:
+    image: ${WEB_USER_IMAGE:?WEB_USER_IMAGE must be an immutable GHCR digest}
+    restart: unless-stopped
+    ports:
+      - "${WEB_USER_PORT:-5173}:80"
+    depends_on:
+      gateway-service:
+        condition: service_healthy
+    networks: [app-net]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ >/dev/null"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+    mem_limit: 96m
+    cpus: "0.10"
+    logging: *bounded-logging
+
+  web-admin:
+    image: ${WEB_ADMIN_IMAGE:?WEB_ADMIN_IMAGE must be an immutable GHCR digest}
+    restart: unless-stopped
+    ports:
+      - "${WEB_ADMIN_PORT:-5174}:80"
+    depends_on:
+      gateway-service:
+        condition: service_healthy
+    networks: [app-net]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ >/dev/null"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+    mem_limit: 96m
+    cpus: "0.10"
+    logging: *bounded-logging
+
+volumes:
+  mysql-data:
+  redis-data:
+  rabbitmq-data:
+  problem-testcases:
+  operation-artifacts:
+  testcase-cache:
+  ai-draft-artifacts:
+  sandbox-tmp:
+
+networks:
+  app-net:
+    driver: bridge
+  judge-net:
+    driver: bridge
+    internal: true

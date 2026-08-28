@@ -1,0 +1,524 @@
+name: ai-oj-next
+
+services:
+  mysql:
+    image: mysql:8.4
+    profiles: ["core", "infra"]
+    command: --innodb-buffer-pool-size=256M --max-connections=50
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-ai_oj_next}
+      MYSQL_USER: ${MYSQL_USER:-aioj}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-change-me}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-change-root-me}
+    ports:
+      - "127.0.0.1:3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+    mem_limit: 640m
+    cpus: "0.75"
+
+  redis:
+    image: redis:7.4-alpine
+    profiles: ["core", "infra"]
+    command: sh -c 'redis-server --appendonly yes --requirepass "$${REDIS_PASSWORD}" --maxmemory 64mb --maxmemory-policy allkeys-lru'
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-change-redis-me}
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a $${REDIS_PASSWORD} ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+    mem_limit: 96m
+    cpus: "0.25"
+
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    profiles: ["core", "infra"]
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-aioj}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-change-rabbit-me}
+    ports:
+      - "127.0.0.1:5672:5672"
+      - "127.0.0.1:15672:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+    mem_limit: 256m
+    cpus: "0.50"
+
+  nacos:
+    image: nacos/nacos-server:v3.0.3
+    profiles: ["discovery", "infra"]
+    environment:
+      MODE: standalone
+      JVM_XMS: 256m
+      JVM_XMX: 384m
+      NACOS_AUTH_ENABLE: "true"
+      NACOS_AUTH_TOKEN: ${NACOS_AUTH_TOKEN:-replace-with-long-nacos-token}
+      NACOS_AUTH_IDENTITY_KEY: ${NACOS_AUTH_IDENTITY_KEY:-nacos}
+      NACOS_AUTH_IDENTITY_VALUE: ${NACOS_AUTH_IDENTITY_VALUE:-nacos}
+    ports:
+      - "127.0.0.1:8848:8848"
+      - "127.0.0.1:9848:9848"
+      - "127.0.0.1:9849:9849"
+      - "127.0.0.1:7848:7848"
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - nacos-data:/home/nacos/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8848/nacos/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 8s
+      retries: 20
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+    mem_limit: 512m
+    cpus: "0.50"
+
+  sentinel-dashboard:
+    image: bladex/sentinel-dashboard:1.8.8
+    profiles: ["observability", "infra"]
+    ports:
+      - "127.0.0.1:8858:8858"
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+    mem_limit: 192m
+    cpus: "0.25"
+
+  prometheus:
+    image: prom/prometheus:v3.0.1
+    profiles: ["observability"]
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "127.0.0.1:9090:9090"
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+    mem_limit: 192m
+    cpus: "0.25"
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    profiles: ["observability"]
+    ports:
+      - "127.0.0.1:3000:3000"
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+    mem_limit: 192m
+    cpus: "0.25"
+
+  gateway-service:
+    profiles: ["app"]
+    build:
+      context: ..
+      dockerfile: deploy/docker/backend.Dockerfile
+      args:
+        SERVICE_MODULE: gateway-service
+    environment:
+      SERVER_PORT: 8101
+      JAVA_OPTS: ${GATEWAY_JAVA_OPTS:--XX:InitialRAMPercentage=15 -XX:MaxRAMPercentage=50 -XX:+ExitOnOutOfMemoryError}
+      NACOS_ENABLED: ${NACOS_ENABLED:-false}
+      NACOS_SERVER_ADDR: ${NACOS_SERVER_ADDR:-nacos:8848}
+      SENTINEL_DASHBOARD: ${SENTINEL_DASHBOARD:-sentinel-dashboard:8858}
+      AUTH_SERVICE_URI: http://auth-service:8201
+      PROBLEM_SERVICE_URI: http://problem-service:8202
+      AI_SERVICE_URI: http://ai-service:8204
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:5176,http://127.0.0.1:5173,http://127.0.0.1:5174,http://127.0.0.1:5175,http://127.0.0.1:5176}
+      GATEWAY_RESPONSE_TIMEOUT: ${GATEWAY_RESPONSE_TIMEOUT:-240s}
+      AI_GATEWAY_RESPONSE_TIMEOUT_MS: ${AI_GATEWAY_RESPONSE_TIMEOUT_MS:-900000}
+      GATEWAY_CONNECT_TIMEOUT_MS: ${GATEWAY_CONNECT_TIMEOUT_MS:-10000}
+      JWT_HMAC_SECRET: ${JWT_HMAC_SECRET:-replace-with-at-least-32-bytes-dev-secret}
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: ${MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE:-health}
+      SPRINGDOC_ENABLED: ${SPRINGDOC_ENABLED:-false}
+    ports:
+      - "127.0.0.1:${GATEWAY_PORT:-8101}:8101"
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      problem-service:
+        condition: service_healthy
+      ai-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8101/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+    mem_limit: 320m
+    cpus: "0.35"
+
+  auth-service:
+    profiles: ["app"]
+    build:
+      context: ..
+      dockerfile: deploy/docker/backend.Dockerfile
+      args:
+        SERVICE_MODULE: auth-service
+    environment:
+      SERVER_PORT: 8201
+      JAVA_OPTS: ${AUTH_JAVA_OPTS:--XX:InitialRAMPercentage=15 -XX:MaxRAMPercentage=50 -XX:+ExitOnOutOfMemoryError}
+      MYSQL_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-ai_oj_next}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+      MYSQL_USER: ${MYSQL_USER:-aioj}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-change-me}
+      AUTH_DB_POOL_MAX: ${AUTH_DB_POOL_MAX:-4}
+      AUTH_DB_POOL_MIN_IDLE: ${AUTH_DB_POOL_MIN_IDLE:-1}
+      DB_CONNECTION_TIMEOUT_MS: ${DB_CONNECTION_TIMEOUT_MS:-5000}
+      FLYWAY_ENABLED: ${AUTH_FLYWAY_ENABLED:-true}
+      NACOS_ENABLED: ${NACOS_ENABLED:-false}
+      NACOS_SERVER_ADDR: ${NACOS_SERVER_ADDR:-nacos:8848}
+      SENTINEL_DASHBOARD: ${SENTINEL_DASHBOARD:-sentinel-dashboard:8858}
+      JWT_HMAC_SECRET: ${JWT_HMAC_SECRET:-replace-with-at-least-32-bytes-dev-secret}
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: ${MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE:-health}
+      SPRINGDOC_ENABLED: ${SPRINGDOC_ENABLED:-false}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8201/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+    mem_limit: 384m
+    cpus: "0.35"
+
+  problem-service:
+    profiles: ["app"]
+    build:
+      context: ..
+      dockerfile: deploy/docker/backend.Dockerfile
+      args:
+        SERVICE_MODULE: problem-service
+    environment:
+      SERVER_PORT: 8202
+      JAVA_OPTS: ${PROBLEM_JAVA_OPTS:--XX:InitialRAMPercentage=15 -XX:MaxRAMPercentage=50 -XX:+ExitOnOutOfMemoryError}
+      MYSQL_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-ai_oj_next}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+      MYSQL_USER: ${MYSQL_USER:-aioj}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-change-me}
+      PROBLEM_DB_POOL_MAX: ${PROBLEM_DB_POOL_MAX:-8}
+      PROBLEM_DB_POOL_MIN_IDLE: ${PROBLEM_DB_POOL_MIN_IDLE:-2}
+      DB_CONNECTION_TIMEOUT_MS: ${DB_CONNECTION_TIMEOUT_MS:-5000}
+      REDIS_HOST: redis
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-change-redis-me}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-aioj}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-change-rabbit-me}
+      FLYWAY_ENABLED: ${PROBLEM_FLYWAY_ENABLED:-false}
+      NACOS_ENABLED: ${NACOS_ENABLED:-false}
+      NACOS_SERVER_ADDR: ${NACOS_SERVER_ADDR:-nacos:8848}
+      JWT_HMAC_SECRET: ${JWT_HMAC_SECRET:-replace-with-at-least-32-bytes-dev-secret}
+      AIOJ_INTERNAL_API_TOKEN: ${AIOJ_INTERNAL_API_TOKEN:-}
+      AI_SERVICE_URI: http://ai-service:8204
+      AIOJ_TESTCASE_STORAGE_ROOT: /aioj/testcases
+      AIOJ_OPERATION_ARTIFACT_ROOT: /aioj/operation-artifacts
+      AIOJ_OPERATION_EXECUTOR_POOL_SIZE: ${AIOJ_OPERATION_EXECUTOR_POOL_SIZE:-2}
+      AIOJ_OPERATION_POLL_BATCH_SIZE: ${AIOJ_OPERATION_POLL_BATCH_SIZE:-3}
+      AIOJ_PLAGIARISM_EXECUTOR_POOL_SIZE: ${AIOJ_PLAGIARISM_EXECUTOR_POOL_SIZE:-1}
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: ${MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE:-health}
+      SPRINGDOC_ENABLED: ${SPRINGDOC_ENABLED:-false}
+    volumes:
+      - problem-testcases:/aioj/testcases
+      - operation-artifacts:/aioj/operation-artifacts
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8202/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+    mem_limit: 640m
+    cpus: "0.65"
+
+  ai-service:
+    profiles: ["app"]
+    build:
+      context: ..
+      dockerfile: deploy/docker/backend.Dockerfile
+      args:
+        SERVICE_MODULE: ai-service
+    environment:
+      SERVER_PORT: 8204
+      JAVA_OPTS: ${AI_JAVA_OPTS:--XX:InitialRAMPercentage=15 -XX:MaxRAMPercentage=50 -XX:+ExitOnOutOfMemoryError}
+      MYSQL_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-ai_oj_next}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+      MYSQL_USER: ${MYSQL_USER:-aioj}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-change-me}
+      AI_DB_POOL_MAX: ${AI_DB_POOL_MAX:-4}
+      AI_DB_POOL_MIN_IDLE: ${AI_DB_POOL_MIN_IDLE:-1}
+      DB_CONNECTION_TIMEOUT_MS: ${DB_CONNECTION_TIMEOUT_MS:-5000}
+      REDIS_HOST: redis
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-change-redis-me}
+      FLYWAY_ENABLED: ${AI_FLYWAY_ENABLED:-false}
+      NACOS_ENABLED: ${NACOS_ENABLED:-false}
+      NACOS_SERVER_ADDR: ${NACOS_SERVER_ADDR:-nacos:8848}
+      JWT_HMAC_SECRET: ${JWT_HMAC_SECRET:-replace-with-at-least-32-bytes-dev-secret}
+      AIOJ_INTERNAL_API_TOKEN: ${AIOJ_INTERNAL_API_TOKEN:-}
+      PROBLEM_SERVICE_URI: http://problem-service:8202
+      JUDGE_WORKER_URI: ${JUDGE_WORKER_URI:-http://judge-worker:8203}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com/chat/completions}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-v4-pro}
+      MOONSHOT_BASE_URL: ${MOONSHOT_BASE_URL:-https://api.moonshot.cn/v1/chat/completions}
+      MOONSHOT_MODEL: ${MOONSHOT_MODEL:-}
+      KIMI_API_KEY: ${KIMI_API_KEY:-}
+      KIMI_MODEL: ${KIMI_MODEL:-}
+      DEEPSEEK_THINKING_ENABLED: ${DEEPSEEK_THINKING_ENABLED:-false}
+      DEEPSEEK_REASONING_EFFORT: ${DEEPSEEK_REASONING_EFFORT:-high}
+      AI_HTTP_CONNECT_TIMEOUT_MS: ${AI_HTTP_CONNECT_TIMEOUT_MS:-10000}
+      AI_HTTP_READ_TIMEOUT_MS: ${AI_HTTP_READ_TIMEOUT_MS:-300000}
+      AI_CHAT_CORE_POOL_SIZE: ${AI_CHAT_CORE_POOL_SIZE:-2}
+      AI_CHAT_MAX_POOL_SIZE: ${AI_CHAT_MAX_POOL_SIZE:-4}
+      AI_CHAT_QUEUE_CAPACITY: ${AI_CHAT_QUEUE_CAPACITY:-32}
+      AI_STUDENT_ASSISTANT_CONCURRENCY: ${AI_STUDENT_ASSISTANT_CONCURRENCY:-4}
+      AI_PROBLEM_DRAFT_CONCURRENCY: ${AI_PROBLEM_DRAFT_CONCURRENCY:-1}
+      AI_INTENT_MEMORY_CONCURRENCY: ${AI_INTENT_MEMORY_CONCURRENCY:-2}
+      AI_BATCH_REPORT_CONCURRENCY: ${AI_BATCH_REPORT_CONCURRENCY:-1}
+      AI_INTENT_ENABLED: ${AI_INTENT_ENABLED:-true}
+      DEEPSEEK_INTENT_BASE_URL: ${DEEPSEEK_INTENT_BASE_URL:-${DEEPSEEK_BASE_URL:-https://api.deepseek.com/chat/completions}}
+      DEEPSEEK_INTENT_MODEL: ${DEEPSEEK_INTENT_MODEL:-${DEEPSEEK_MODEL:-deepseek-v4-pro}}
+      AI_EMBEDDING_ENABLED: ${AI_EMBEDDING_ENABLED:-false}
+      AI_EMBEDDING_API_KEY: ${AI_EMBEDDING_API_KEY:-}
+      DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: ${MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE:-health}
+      SPRINGDOC_ENABLED: ${SPRINGDOC_ENABLED:-false}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8204/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+    mem_limit: 640m
+    cpus: "0.65"
+
+  judge-worker:
+    profiles: ["judge"]
+    build:
+      context: ..
+      dockerfile: deploy/docker/backend.Dockerfile
+      args:
+        SERVICE_MODULE: judge-worker
+    environment:
+      SERVER_PORT: 8203
+      JAVA_OPTS: ${JUDGE_JAVA_OPTS:--XX:InitialRAMPercentage=15 -XX:MaxRAMPercentage=50 -XX:+ExitOnOutOfMemoryError}
+      MYSQL_URL: ${MYSQL_URL:-jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-ai_oj_next}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai}
+      MYSQL_USER: ${MYSQL_USER:-aioj}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-change-me}
+      JUDGE_DB_POOL_MAX: ${JUDGE_DB_POOL_MAX:-4}
+      JUDGE_DB_POOL_MIN_IDLE: ${JUDGE_DB_POOL_MIN_IDLE:-1}
+      DB_CONNECTION_TIMEOUT_MS: ${DB_CONNECTION_TIMEOUT_MS:-5000}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-aioj}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-change-rabbit-me}
+      NACOS_ENABLED: ${NACOS_ENABLED:-false}
+      NACOS_SERVER_ADDR: ${NACOS_SERVER_ADDR:-nacos:8848}
+      AIOJ_JUDGE_CACHE_ROOT: /aioj/cases
+      SANDBOX_ENDPOINT: ${SANDBOX_ENDPOINT:-http://sandbox:8090/execute}
+      SANDBOX_TOKEN: ${SANDBOX_TOKEN:-}
+      AIOJ_INTERNAL_API_TOKEN: ${AIOJ_INTERNAL_API_TOKEN:-}
+      PROBLEM_SERVICE_BASE_URL: ${PROBLEM_SERVICE_BASE_URL:-http://problem-service:8202}
+      JUDGE_PREFETCH: ${JUDGE_PREFETCH:-2}
+      JUDGE_CONCURRENCY: ${JUDGE_CONCURRENCY:-2}
+      JUDGE_MAX_CONCURRENCY: ${JUDGE_MAX_CONCURRENCY:-2}
+      JUDGE_STDOUT_BASE_COLLECT_LIMIT_BYTES: ${JUDGE_STDOUT_BASE_COLLECT_LIMIT_BYTES:-32768}
+      JUDGE_STDOUT_EXTRA_COLLECT_BYTES: ${JUDGE_STDOUT_EXTRA_COLLECT_BYTES:-32768}
+      JUDGE_STDOUT_MAX_COLLECT_LIMIT_BYTES: ${JUDGE_STDOUT_MAX_COLLECT_LIMIT_BYTES:-1048576}
+      JUDGE_STDERR_COLLECT_LIMIT_BYTES: ${JUDGE_STDERR_COLLECT_LIMIT_BYTES:-32768}
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: ${MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE:-health}
+    volumes:
+      - testcase-cache:/aioj/cases
+    networks:
+      - default
+      - aioj-judge
+    depends_on:
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      problem-service:
+        condition: service_healthy
+      sandbox:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8203/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+    mem_limit: 384m
+    cpus: "0.50"
+
+  sandbox:
+    profiles: ["judge"]
+    build:
+      context: sandbox
+    privileged: true
+    shm_size: 256m
+    environment:
+      ES_HTTP_ADDR: ":8090"
+      ES_AUTH_TOKEN: ${SANDBOX_TOKEN:-}
+      ES_OUTPUT_LIMIT: ${SANDBOX_OUTPUT_LIMIT:-33554432}
+      ES_COPY_OUT_LIMIT: ${SANDBOX_COPY_OUT_LIMIT:-16777216}
+      ES_FILE_TIMEOUT: ${SANDBOX_FILE_TIMEOUT:-10m}
+    ports:
+      - "127.0.0.1:8090:8090"
+    volumes:
+      - testcase-cache:/aioj/cases:ro
+      - sandbox-tmp:/tmp
+    networks:
+      - aioj-judge
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8090/version >/dev/null"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+    mem_limit: 960m
+    cpus: "1.20"
+
+  web-user:
+    profiles: ["app"]
+    build:
+      context: ..
+      dockerfile: deploy/docker/web.Dockerfile
+      args:
+        APP_WORKSPACE: "@aioj/web-user-react"
+        APP_DIR: web-user-react
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api}
+    ports:
+      - "${WEB_USER_PORT:-5173}:80"
+    depends_on:
+      gateway-service:
+        condition: service_healthy
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+    mem_limit: 64m
+    cpus: "0.10"
+
+  web-admin:
+    profiles: ["app"]
+    build:
+      context: ..
+      dockerfile: deploy/docker/web.Dockerfile
+      args:
+        APP_WORKSPACE: "@aioj/web-admin-react"
+        APP_DIR: web-admin-react
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api}
+    ports:
+      - "${WEB_ADMIN_PORT:-5174}:80"
+    depends_on:
+      gateway-service:
+        condition: service_healthy
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+    mem_limit: 64m
+    cpus: "0.10"
+
+volumes:
+  mysql-data:
+  redis-data:
+  rabbitmq-data:
+  nacos-data:
+  problem-testcases:
+  operation-artifacts:
+  testcase-cache:
+  sandbox-tmp:
+
+networks:
+  aioj-judge:
+    driver: bridge

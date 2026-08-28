@@ -1,0 +1,102 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+umask 077
+
+[[ ${EUID:-$(id -u)} -eq 0 ]] || { printf 'aioj-deploy must run as root\n' >&2; exit 77; }
+[[ $# -eq 2 ]] || { printf 'usage: aioj-deploy <release-tag> <manifest-sha256>\n' >&2; exit 64; }
+
+tag=$1
+expected_manifest_sha=$2
+[[ $tag =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] || { printf 'invalid release tag\n' >&2; exit 64; }
+[[ $expected_manifest_sha =~ ^[0-9a-f]{64}$ ]] || { printf 'invalid manifest SHA-256\n' >&2; exit 64; }
+
+root=/opt/aioj
+app_env="$root/env/app.env"
+deploy_env="$root/deploy.env"
+previous_env="$root/deploy.previous.env"
+compose_file="$root/compose.production.yml"
+history="$root/deploy-history"
+lock_file=/run/lock/aioj-deploy.lock
+release_url="https://github.com/Mubai0628/aioj/releases/download/$tag"
+work=$(mktemp -d "$root/.deploy-${tag}.XXXXXX")
+trap 'rm -rf -- "$work"' EXIT
+
+exec 9>"$lock_file"
+flock -n 9 || { printf 'another AIOJ deployment is running\n' >&2; exit 75; }
+
+for command in curl jq sha256sum tar docker flock; do
+  command -v "$command" >/dev/null || { printf 'missing required command: %s\n' "$command" >&2; exit 69; }
+done
+[[ -f $app_env ]] || { printf 'missing server environment: %s\n' "$app_env" >&2; exit 66; }
+
+curl --fail --location --silent --show-error --retry 3 --output "$work/image-manifest.json" "$release_url/image-manifest.json"
+actual_manifest_sha=$(sha256sum "$work/image-manifest.json" | awk '{print $1}')
+[[ $actual_manifest_sha == "$expected_manifest_sha" ]] || { printf 'manifest checksum mismatch\n' >&2; exit 65; }
+
+jq -e --arg tag "$tag" '
+  .schemaVersion == 1 and .release == $tag and .platform == "linux/amd64" and
+  (.deploymentBundle.name == "deployment-bundle.tar.gz") and
+  (.deploymentBundle.sha256 | test("^[0-9a-f]{64}$")) and
+  (.images | keys | sort == ["ai","auth","gateway","judge-worker","problem","sandbox","web-admin","web-user"]) and
+  ([.images[] | test("^ghcr\\.io/mubai0628/aioj-(ai|auth|gateway|judge-worker|problem|sandbox|web-admin|web-user)@sha256:[0-9a-f]{64}$")] | all)
+' "$work/image-manifest.json" >/dev/null || { printf 'release manifest validation failed\n' >&2; exit 65; }
+
+bundle_name=$(jq -r '.deploymentBundle.name' "$work/image-manifest.json")
+bundle_sha=$(jq -r '.deploymentBundle.sha256' "$work/image-manifest.json")
+curl --fail --location --silent --show-error --retry 3 --output "$work/$bundle_name" "$release_url/$bundle_name"
+actual_bundle_sha=$(sha256sum "$work/$bundle_name" | awk '{print $1}')
+[[ $actual_bundle_sha == "$bundle_sha" ]] || { printf 'deployment bundle checksum mismatch\n' >&2; exit 65; }
+
+mkdir "$work/bundle"
+tar -xzf "$work/$bundle_name" -C "$work/bundle" --no-same-owner
+candidate_compose="$work/bundle/deploy/compose.production.yml"
+[[ -f $candidate_compose ]] || { printf 'bundle lacks production Compose\n' >&2; exit 65; }
+
+cat >"$work/deploy.env" <<EOF
+GATEWAY_IMAGE=$(jq -r '.images.gateway' "$work/image-manifest.json")
+AUTH_IMAGE=$(jq -r '.images.auth' "$work/image-manifest.json")
+PROBLEM_IMAGE=$(jq -r '.images.problem' "$work/image-manifest.json")
+AI_IMAGE=$(jq -r '.images.ai' "$work/image-manifest.json")
+JUDGE_IMAGE=$(jq -r '.images["judge-worker"]' "$work/image-manifest.json")
+SANDBOX_IMAGE=$(jq -r '.images.sandbox' "$work/image-manifest.json")
+WEB_USER_IMAGE=$(jq -r '.images["web-user"]' "$work/image-manifest.json")
+WEB_ADMIN_IMAGE=$(jq -r '.images["web-admin"]' "$work/image-manifest.json")
+EOF
+
+docker compose --env-file "$app_env" --env-file "$work/deploy.env" -f "$candidate_compose" config --quiet
+
+if [[ ! -f $deploy_env ]]; then
+  [[ -f $root/initial-cutover.approved ]] || {
+    printf 'initial deployment requires root-owned /opt/aioj/initial-cutover.approved after backup and old-stack stop\n' >&2
+    exit 78
+  }
+fi
+
+mkdir -p "$history/$tag"
+install -m 0600 "$work/image-manifest.json" "$history/$tag/image-manifest.json"
+install -m 0600 "$work/deploy.env" "$history/$tag/deploy.env"
+if [[ -f $deploy_env ]]; then cp -a -- "$deploy_env" "$previous_env"; fi
+if [[ -f $compose_file ]]; then cp -a -- "$compose_file" "$history/$tag/compose.previous.yml"; fi
+install -m 0644 "$candidate_compose" "$compose_file"
+install -m 0600 "$work/deploy.env" "$deploy_env"
+
+compose=(docker compose --env-file "$app_env" --env-file "$deploy_env" -f "$compose_file")
+"${compose[@]}" pull
+"${compose[@]}" up -d --remove-orphans
+
+if ! /usr/local/sbin/aioj-health-check; then
+  printf 'new release failed health verification; attempting image rollback\n' >&2
+  if [[ -f $previous_env ]]; then
+    cp -a -- "$previous_env" "$deploy_env"
+    if [[ -f $history/$tag/compose.previous.yml ]]; then cp -a -- "$history/$tag/compose.previous.yml" "$compose_file"; fi
+    rollback=(docker compose --env-file "$app_env" --env-file "$deploy_env" -f "$compose_file")
+    "${rollback[@]}" pull
+    "${rollback[@]}" up -d --remove-orphans
+    /usr/local/sbin/aioj-health-check || true
+  fi
+  exit 1
+fi
+
+rm -f -- "$root/initial-cutover.approved"
+printf '%s %s %s\n' "$(date --iso-8601=seconds)" "$tag" "$expected_manifest_sha" >"$root/CURRENT_RELEASE"
+printf 'AIOJ release %s deployed successfully.\n' "$tag"

@@ -1,0 +1,20 @@
+CREATE TABLE IF NOT EXISTS ai_model_configs (
+    id BIGINT PRIMARY KEY,
+    scope VARCHAR(40) NOT NULL,
+    provider VARCHAR(64) NOT NULL,
+    base_url VARCHAR(512) NOT NULL,
+    model VARCHAR(160) NOT NULL,
+    enabled TINYINT NOT NULL DEFAULT 1,
+    json_output_enabled TINYINT NOT NULL DEFAULT 1,
+    thinking_enabled TINYINT NOT NULL DEFAULT 0,
+    reasoning_effort VARCHAR(16) NOT NULL DEFAULT 'high',
+    temperature DECIMAL(4,2),
+    max_tokens INT,
+    embedding_dimension INT,
+    api_key_encrypted MEDIUMTEXT,
+    api_key_preview VARCHAR(64),
+    created_at DATETIME(3) NOT NULL,
+    updated_at DATETIME(3) NOT NULL,
+    updated_by BIGINT,
+    UNIQUE KEY uk_ai_model_configs_scope (scope)
+);

@@ -1,0 +1,10 @@
+{
+  "name": "@aioj/i18n",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    "./messages": "./src/messages.ts",
+    "./vanilla": "./src/vanilla.ts"
+  }
+}

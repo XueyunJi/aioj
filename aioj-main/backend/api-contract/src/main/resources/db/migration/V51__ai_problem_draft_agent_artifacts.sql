@@ -1,0 +1,20 @@
+CREATE TABLE IF NOT EXISTS ai_problem_draft_agent_artifacts (
+    id BIGINT PRIMARY KEY,
+    draft_id BIGINT NULL,
+    job_id BIGINT NOT NULL,
+    job_item_id BIGINT NULL,
+    attempt_no INT NOT NULL,
+    artifact_type VARCHAR(64) NOT NULL,
+    status VARCHAR(64) NOT NULL,
+    storage_key VARCHAR(500) NULL,
+    file_name VARCHAR(255) NULL,
+    sha256 VARCHAR(64) NULL,
+    file_size_bytes BIGINT NOT NULL DEFAULT 0,
+    case_count INT NOT NULL DEFAULT 0,
+    manifest_summary_json JSON NULL,
+    error_summary VARCHAR(1000) NULL,
+    created_at DATETIME(6) NOT NULL,
+    INDEX idx_ai_problem_draft_agent_artifacts_draft (draft_id, attempt_no),
+    INDEX idx_ai_problem_draft_agent_artifacts_job_item (job_id, job_item_id, attempt_no),
+    INDEX idx_ai_problem_draft_agent_artifacts_type_status (artifact_type, status)
+);

@@ -1,0 +1,62 @@
+# Secrets and local configuration
+.env
+.env.local
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+
+# IDE / editor
+.idea/
+.vscode/
+*.iml
+
+# Java / Maven
+**/target/
+**/*.class
+
+# Node / frontend
+**/node_modules/
+**/dist/
+**/coverage/
+**/.npm-cache/
+
+# Logs and local runtime output
+*.log
+logs/
+**/dev-server*.log
+**/dev-server.err.log
+
+# Docker/local deployment state
+deploy/data/
+**/deploy/data/
+docker-data/
+
+# Restored production artifacts and generated packages
+_restore_files_0813/
+_runtime_compare/
+_state_0813/
+backup-before-0813-restore/
+**/release-out/
+**/deploy-history/
+**/backups/
+**/*.zip
+**/*.tar
+**/*.tar.gz
+**/*.sql
+**/*.sql.gz
+**/*.sha256
+
+# Local archives / generated reports
+archive/
+graphify-out/
+scripts/agent-eval/out/
+*-snapshot.md
+
+# OS files
+Thumbs.db
+desktop.ini
+
+# Keep Flyway migrations tracked even though SQL exports are ignored.
+!aioj-main/backend/api-contract/src/main/resources/db/migration/*.sql

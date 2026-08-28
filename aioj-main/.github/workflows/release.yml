@@ -1,0 +1,222 @@
+name: Release images and deploy
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+  packages: write
+  id-token: write
+  attestations: write
+
+concurrency:
+  group: production-release
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Validate release source
+    runs-on: ubuntu-24.04
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.release.tag_name }}
+      - id: release
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          tag='${{ github.event.release.tag_name }}'
+          [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          git fetch origin main
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main
+          printf 'tag=%s\n' "$tag" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build ${{ matrix.service }}
+    needs: validate
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: gateway
+            dockerfile: deploy/docker/backend.Dockerfile
+            build_args: SERVICE_MODULE=gateway-service
+          - service: auth
+            dockerfile: deploy/docker/backend.Dockerfile
+            build_args: SERVICE_MODULE=auth-service
+          - service: problem
+            dockerfile: deploy/docker/backend.Dockerfile
+            build_args: SERVICE_MODULE=problem-service
+          - service: ai
+            dockerfile: deploy/docker/backend.Dockerfile
+            build_args: SERVICE_MODULE=ai-service
+          - service: judge-worker
+            dockerfile: deploy/docker/backend.Dockerfile
+            build_args: SERVICE_MODULE=judge-worker
+          - service: sandbox
+            dockerfile: deploy/sandbox/Dockerfile
+            build_args: ""
+          - service: web-user
+            dockerfile: deploy/docker/web.Dockerfile
+            build_args: |-
+              APP_WORKSPACE=@aioj/web-user-react
+              APP_DIR=web-user-react
+              VITE_API_BASE_URL=/api
+          - service: web-admin
+            dockerfile: deploy/docker/web.Dockerfile
+            build_args: |-
+              APP_WORKSPACE=@aioj/web-admin-react
+              APP_DIR=web-admin-react
+              VITE_API_BASE_URL=/api
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: build
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ghcr.io/mubai0628/aioj-${{ matrix.service }}:${{ needs.validate.outputs.tag }}
+            ghcr.io/mubai0628/aioj-${{ matrix.service }}:sha-${{ github.sha }}
+          build-args: ${{ matrix.build_args }}
+          provenance: mode=max
+          sbom: true
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@96b4a1ef7235a096b17240c259729fdd70c83d45 # v2
+        with:
+          subject-name: ghcr.io/mubai0628/aioj-${{ matrix.service }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
+      - name: Write immutable image fragment
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          mkdir -p fragments
+          jq -n \
+            --arg service '${{ matrix.service }}' \
+            --arg image 'ghcr.io/mubai0628/aioj-${{ matrix.service }}' \
+            --arg digest '${{ steps.build.outputs.digest }}' \
+            '{service:$service,image:$image,digest:$digest}' \
+            > "fragments/${{ matrix.service }}.json"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: image-${{ matrix.service }}
+          path: fragments/${{ matrix.service }}.json
+          if-no-files-found: error
+          retention-days: 14
+
+  manifest:
+    name: Publish release manifest
+    needs: [validate, build]
+    runs-on: ubuntu-24.04
+    outputs:
+      manifest_sha: ${{ steps.assets.outputs.manifest_sha }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "24"
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: image-*
+          path: manifest-fragments
+          merge-multiple: true
+      - id: assets
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.validate.outputs.tag }}
+        run: |
+          set -Eeuo pipefail
+          mkdir -p release-out
+          tar -czf release-out/deployment-bundle.tar.gz \
+            deploy/compose.production.yml deploy/env scripts/deploy
+          bundle_sha=$(sha256sum release-out/deployment-bundle.tar.gz | awk '{print $1}')
+          node scripts/release/assemble-manifest.mjs \
+            manifest-fragments "$TAG" "$GITHUB_SHA" "$bundle_sha" \
+            release-out/image-manifest.json
+          (cd release-out && sha256sum image-manifest.json > image-manifest.json.sha256)
+          manifest_sha=$(sha256sum release-out/image-manifest.json | awk '{print $1}')
+          printf 'manifest_sha=%s\n' "$manifest_sha" >> "$GITHUB_OUTPUT"
+          gh release upload "$TAG" \
+            release-out/image-manifest.json \
+            release-out/image-manifest.json.sha256 \
+            release-out/deployment-bundle.tar.gz \
+            --clobber
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-assets
+          path: release-out/
+          if-no-files-found: error
+          retention-days: 30
+
+  deploy:
+    name: Deploy to production
+    needs: [validate, manifest]
+    runs-on: ubuntu-24.04
+    environment: production
+    steps:
+      - name: Invoke restricted deployment gate
+        shell: bash
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_SSH_HOST }}
+          DEPLOY_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_SSH_KNOWN_HOSTS }}
+          TAG: ${{ needs.validate.outputs.tag }}
+          MANIFEST_SHA: ${{ needs.manifest.outputs.manifest_sha }}
+        run: |
+          set -Eeuo pipefail
+          install -d -m 0700 "$HOME/.ssh"
+          printf '%s\n' "$DEPLOY_PRIVATE_KEY" > "$HOME/.ssh/aioj-deploy"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 0600 "$HOME/.ssh/aioj-deploy" "$HOME/.ssh/known_hosts"
+          # The remote gate returns curl's exit 56 only before any Compose state is changed.
+          # Never retry other failures because their server-side mutation point is unknown.
+          for attempt in 1 2 3 4 5; do
+            if ssh -T \
+              -i "$HOME/.ssh/aioj-deploy" \
+              -o BatchMode=yes \
+              -o IdentitiesOnly=yes \
+              -o PasswordAuthentication=no \
+              -o KbdInteractiveAuthentication=no \
+              -o StrictHostKeyChecking=yes \
+              -o UpdateHostKeys=no \
+              -o ServerAliveInterval=15 \
+              -o ServerAliveCountMax=4 \
+              -o HostKeyAlias=aioj_a \
+              -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
+              "aioj-deploy@$DEPLOY_HOST" \
+              "deploy $TAG $MANIFEST_SHA"; then
+              exit 0
+            else
+              status=$?
+            fi
+
+            if [[ $status -ne 56 || $attempt -eq 5 ]]; then
+              exit "$status"
+            fi
+
+            delay=$((attempt * 15))
+            printf 'Release asset download was interrupted; retrying deployment gate in %ss (attempt %s/5).\n' \
+              "$delay" "$attempt"
+            sleep "$delay"
+          done

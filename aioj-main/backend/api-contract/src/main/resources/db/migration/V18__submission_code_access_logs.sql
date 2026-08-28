@@ -1,0 +1,20 @@
+CREATE TABLE IF NOT EXISTS submission_code_access_logs (
+    id BIGINT PRIMARY KEY,
+    contest_id BIGINT NOT NULL,
+    submission_id BIGINT NOT NULL,
+    viewer_user_id BIGINT NOT NULL,
+    target_user_id BIGINT NOT NULL,
+    contest_participant_id BIGINT,
+    reason VARCHAR(240),
+    trace_id VARCHAR(80),
+    created_at DATETIME(3) NOT NULL,
+    CONSTRAINT fk_submission_code_access_logs_contest FOREIGN KEY (contest_id) REFERENCES contests(id),
+    CONSTRAINT fk_submission_code_access_logs_submission FOREIGN KEY (submission_id) REFERENCES submissions(id),
+    CONSTRAINT fk_submission_code_access_logs_viewer FOREIGN KEY (viewer_user_id) REFERENCES users(id),
+    CONSTRAINT fk_submission_code_access_logs_target FOREIGN KEY (target_user_id) REFERENCES users(id),
+    CONSTRAINT fk_submission_code_access_logs_participant FOREIGN KEY (contest_participant_id) REFERENCES contest_participants(id),
+    INDEX idx_submission_code_access_logs_contest (contest_id, created_at),
+    INDEX idx_submission_code_access_logs_submission (submission_id, created_at),
+    INDEX idx_submission_code_access_logs_viewer (viewer_user_id, created_at),
+    INDEX idx_submission_code_access_logs_target (target_user_id, created_at)
+);

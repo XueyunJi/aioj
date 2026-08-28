@@ -1,0 +1,21 @@
+CREATE TABLE IF NOT EXISTS ai_problem_draft_audit_snapshots (
+    id BIGINT PRIMARY KEY,
+    job_id BIGINT NULL,
+    draft_id BIGINT NULL,
+    creator_user_id BIGINT NULL,
+    stage VARCHAR(64) NOT NULL,
+    attempt INT NOT NULL DEFAULT 0,
+    status VARCHAR(32) NOT NULL,
+    model VARCHAR(128) NULL,
+    prompt_tokens BIGINT NOT NULL DEFAULT 0,
+    completion_tokens BIGINT NOT NULL DEFAULT 0,
+    input_summary_json JSON NULL,
+    output_summary_json JSON NULL,
+    error_code VARCHAR(128) NULL,
+    error_message VARCHAR(1000) NULL,
+    created_at DATETIME(6) NOT NULL,
+    INDEX idx_ai_problem_draft_audit_job (job_id, created_at),
+    INDEX idx_ai_problem_draft_audit_draft (draft_id, created_at),
+    INDEX idx_ai_problem_draft_audit_creator (creator_user_id, created_at),
+    INDEX idx_ai_problem_draft_audit_stage (stage, created_at)
+);

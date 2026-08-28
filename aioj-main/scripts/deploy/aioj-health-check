@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+root=${AIOJ_ROOT:-/opt/aioj}
+compose_file="$root/compose.production.yml"
+app_env="$root/env/app.env"
+deploy_env="$root/deploy.env"
+services=(mysql redis rabbitmq auth-service problem-service sandbox judge-worker ai-service gateway-service web-user web-admin)
+deadline=$((SECONDS + ${AIOJ_HEALTH_TIMEOUT_SECONDS:-600}))
+
+compose() {
+  docker compose --env-file "$app_env" --env-file "$deploy_env" -f "$compose_file" "$@"
+}
+
+while (( SECONDS < deadline )); do
+  all_healthy=true
+  for service in "${services[@]}"; do
+    container_id=$(compose ps -q "$service")
+    if [[ -z $container_id ]]; then
+      all_healthy=false
+      continue
+    fi
+    status=$(docker inspect --format '{{.State.Status}}' "$container_id")
+    health=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$container_id")
+    if [[ $status != running || $health != healthy ]]; then
+      all_healthy=false
+    fi
+  done
+  $all_healthy && break
+  sleep 5
+done
+
+for service in "${services[@]}"; do
+  container_id=$(compose ps -q "$service")
+  [[ -n "$container_id" ]] || { printf 'missing container: %s\n' "$service" >&2; exit 1; }
+  status=$(docker inspect --format '{{.State.Status}}' "$container_id")
+  health=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$container_id")
+  [[ "$status" == running && "$health" == healthy ]] || {
+    printf 'container not healthy: %s (status=%s health=%s)\n' "$service" "$status" "$health" >&2
+    exit 1
+  }
+done
+
+published_port() {
+  local service=$1 container_port=$2 container_id
+  container_id=$(compose ps -q "$service")
+  docker inspect --format "{{(index (index .NetworkSettings.Ports \"$container_port/tcp\") 0).HostPort}}" "$container_id"
+}
+
+gateway_port=$(published_port gateway-service 8101)
+web_user_port=$(published_port web-user 80)
+web_admin_port=$(published_port web-admin 80)
+curl -fsS --max-time 10 "http://127.0.0.1:$gateway_port/actuator/health" | grep -q '"status":"UP"'
+curl -fsS --max-time 10 "http://127.0.0.1:$web_user_port/" >/dev/null
+curl -fsS --max-time 10 "http://127.0.0.1:$web_admin_port/" >/dev/null
+
+printf 'AIOJ health verification passed.\n'

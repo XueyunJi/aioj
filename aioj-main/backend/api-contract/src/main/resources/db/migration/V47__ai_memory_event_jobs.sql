@@ -1,0 +1,40 @@
+CREATE TABLE ai_domain_events (
+    id BIGINT PRIMARY KEY,
+    event_type VARCHAR(80) NOT NULL,
+    user_id BIGINT NOT NULL,
+    source_type VARCHAR(80) NOT NULL,
+    source_id VARCHAR(128) NULL,
+    idempotency_key VARCHAR(191) NOT NULL,
+    payload_json JSON NULL,
+    sensitivity VARCHAR(48) NOT NULL DEFAULT 'USER_PRIVATE_SAFE',
+    created_at DATETIME(6) NOT NULL,
+    updated_at DATETIME(6) NOT NULL,
+    UNIQUE KEY uk_ai_domain_events_idempotency (idempotency_key),
+    KEY idx_ai_domain_events_user_created (user_id, created_at),
+    KEY idx_ai_domain_events_type_created (event_type, created_at),
+    KEY idx_ai_domain_events_source_created (source_type, source_id, created_at)
+);
+
+CREATE TABLE ai_memory_jobs (
+    id BIGINT PRIMARY KEY,
+    event_id BIGINT NOT NULL,
+    job_type VARCHAR(80) NOT NULL,
+    status VARCHAR(32) NOT NULL,
+    idempotency_key VARCHAR(191) NOT NULL,
+    payload_json JSON NULL,
+    attempt_count INT NOT NULL DEFAULT 0,
+    max_attempts INT NOT NULL DEFAULT 3,
+    next_run_at DATETIME(6) NOT NULL,
+    lease_owner VARCHAR(128) NULL,
+    lease_expires_at DATETIME(6) NULL,
+    last_error_summary VARCHAR(1000) NULL,
+    started_at DATETIME(6) NULL,
+    completed_at DATETIME(6) NULL,
+    created_at DATETIME(6) NOT NULL,
+    updated_at DATETIME(6) NOT NULL,
+    UNIQUE KEY uk_ai_memory_jobs_idempotency (idempotency_key),
+    KEY idx_ai_memory_jobs_status_due (status, next_run_at, created_at),
+    KEY idx_ai_memory_jobs_event (event_id),
+    KEY idx_ai_memory_jobs_type_status (job_type, status, created_at),
+    KEY idx_ai_memory_jobs_lease (lease_expires_at)
+);

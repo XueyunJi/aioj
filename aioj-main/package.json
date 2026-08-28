@@ -1,0 +1,59 @@
+{
+  "name": "aioj",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Campus online judge with audited AI assistance",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build:react",
+    "build:react": "npm run build:user:react && npm run build:admin:react",
+    "build:user": "npm run build:user:react",
+    "build:admin": "npm run build:admin:react",
+    "build:user:react": "npm run build -w @aioj/web-user-react",
+    "build:admin:react": "npm run build -w @aioj/web-admin-react",
+    "dev:user": "npm run dev -w @aioj/web-user-react",
+    "dev:admin": "npm run dev -w @aioj/web-admin-react",
+    "typecheck": "npm run typecheck:react",
+    "typecheck:react": "npm run typecheck:user:react && npm run typecheck:admin:react",
+    "typecheck:user:react": "npm run typecheck -w @aioj/web-user-react",
+    "typecheck:admin:react": "npm run typecheck -w @aioj/web-admin-react",
+    "test:auth": "vitest run --config vitest.auth.config.ts",
+    "check:error-feedback": "node scripts/check-error-feedback.mjs"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.5",
+    "jsdom": "^30.0.1",
+    "typescript": "5.9.3",
+    "vite": "8.2.1",
+    "vitest": "^4.1.10"
+  },
+  "dependencies": {
+    "@radix-ui/react-dialog": "^1.1.15",
+    "@radix-ui/react-dropdown-menu": "^2.1.16",
+    "@radix-ui/react-select": "^2.2.6",
+    "@radix-ui/react-slot": "^1.2.4",
+    "@radix-ui/react-tabs": "^1.1.13",
+    "@tailwindcss/vite": "^4.3.3",
+    "@tanstack/react-query": "^5.90.12",
+    "@tanstack/react-router": "^1.140.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.468.0",
+    "motion": "^12.23.25",
+    "react": "^19.2.1",
+    "react-dom": "^19.2.1",
+    "react-hook-form": "^7.67.0",
+    "tailwind-merge": "^3.4.0",
+    "tailwindcss": "^4.3.3",
+    "zod": "^4.1.13"
+  },
+  "overrides": {
+    "dompurify": "3.4.13"
+  }
+}

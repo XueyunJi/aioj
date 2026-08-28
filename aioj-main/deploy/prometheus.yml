@@ -1,0 +1,13 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: "aioj"
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets:
+          - gateway-service:8101
+          - auth-service:8201
+          - problem-service:8202
+          - judge-worker:8203
+          - ai-service:8204

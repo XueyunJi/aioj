@@ -1,0 +1,22 @@
+CREATE TABLE IF NOT EXISTS ai_problem_draft_testcase_artifacts (
+    id BIGINT PRIMARY KEY,
+    draft_id BIGINT NOT NULL,
+    creator_user_id BIGINT NULL,
+    status VARCHAR(32) NOT NULL,
+    file_name VARCHAR(255) NOT NULL,
+    storage_path VARCHAR(512) NOT NULL,
+    file_size_bytes BIGINT NOT NULL,
+    sha256 CHAR(64) NOT NULL,
+    case_count INT NOT NULL DEFAULT 0,
+    total_input_bytes BIGINT NOT NULL DEFAULT 0,
+    total_output_bytes BIGINT NOT NULL DEFAULT 0,
+    largest_case_bytes BIGINT NOT NULL DEFAULT 0,
+    package_summary_json JSON NULL,
+    imported_problem_id BIGINT NULL,
+    problem_testcase_package_id BIGINT NULL,
+    created_at DATETIME(6) NOT NULL,
+    updated_at DATETIME(6) NOT NULL,
+    INDEX idx_ai_problem_draft_testcase_artifacts_draft (draft_id, status, created_at),
+    INDEX idx_ai_problem_draft_testcase_artifacts_imported_problem (imported_problem_id),
+    INDEX idx_ai_problem_draft_testcase_artifacts_package (problem_testcase_package_id)
+);

@@ -1,0 +1,86 @@
+[
+  {
+    "name": "wrong_answer_model_json",
+    "status": "WRONG_ANSWER",
+    "userMessage": "我提交了，答案错误，请检查二分答案 check 单调性。",
+    "assistantAnswer": "先看 check 单调性和边界。",
+    "modelJson": {
+      "summary": "二分答案 check 单调性判断错误。",
+      "rootCauseTags": ["wrong_answer"],
+      "algorithmTags": ["binary_search"],
+      "bugPatternTags": ["monotonicity", "boundary"],
+      "complexityTags": [],
+      "nextSteps": ["重新证明 check 的单调性"],
+      "evidenceItems": ["WA on sample 2"],
+      "confidence": 0.82,
+      "profileKey": "wrong_answer_binary_search",
+      "profileLabel": "提交分析候选弱点：二分答案",
+      "profileEligible": true,
+      "masteryEvidence": false
+    },
+    "expectedProfileEligible": true,
+    "expectedMasteryEvidence": false,
+    "expectedModelGenerated": true,
+    "expectedTags": ["wrong_answer", "binary_search", "monotonicity", "boundary"],
+    "expectedProfileKey": "wrong_answer_binary_search"
+  },
+  {
+    "name": "time_limit_fallback",
+    "status": "TIME_LIMIT_EXCEEDED",
+    "userMessage": "这次超时了，复杂度可能太高。",
+    "assistantAnswer": "需要按最大数据范围重新估算复杂度。",
+    "expectedProfileEligible": true,
+    "expectedMasteryEvidence": false,
+    "expectedModelGenerated": false,
+    "expectedTags": ["time_limit_exceeded", "time_complexity"],
+    "expectedProfileKey": "time_limit_exceeded_complexity"
+  },
+  {
+    "name": "compile_error_fallback",
+    "status": "COMPILE_ERROR",
+    "userMessage": "编译错误了。",
+    "assistantAnswer": "先看编译器提示。",
+    "expectedProfileEligible": false,
+    "expectedMasteryEvidence": false,
+    "expectedModelGenerated": false,
+    "expectedTags": ["compile_error"],
+    "expectedProfileKey": "compile_error_binary_search"
+  },
+  {
+    "name": "accepted_mastery_model_json",
+    "status": "ACCEPTED",
+    "userMessage": "这次已经通过，我能解释 check 单调性和边界。",
+    "assistantAnswer": "通过原因是 check 单调，并且边界更新正确。",
+    "modelJson": {
+      "summary": "学生解释了 check 单调性和边界。",
+      "rootCauseTags": ["accepted"],
+      "algorithmTags": ["binary_search"],
+      "bugPatternTags": [],
+      "complexityTags": [],
+      "nextSteps": ["复用 check 不变量"],
+      "evidenceItems": ["解释了通过原因"],
+      "confidence": 0.91,
+      "profileKey": "accepted_binary_search",
+      "profileLabel": "二分答案掌握证据",
+      "profileEligible": true,
+      "masteryEvidence": true
+    },
+    "expectedProfileEligible": false,
+    "expectedMasteryEvidence": true,
+    "expectedModelGenerated": true,
+    "expectedTags": ["accepted", "binary_search"],
+    "expectedProfileKey": "accepted_binary_search"
+  },
+  {
+    "name": "malformed_json_fallback_safe",
+    "status": "WRONG_ANSWER",
+    "userMessage": "我提交了，答案错误。",
+    "assistantAnswer": "```cpp\nint main(){return 0;}\n```\ntoken: leak",
+    "modelContent": "not json",
+    "expectedProfileEligible": true,
+    "expectedMasteryEvidence": false,
+    "expectedModelGenerated": false,
+    "expectedTags": ["wrong_answer", "debugging"],
+    "expectedUnsafeAbsent": ["int main", "token: leak"]
+  }
+]

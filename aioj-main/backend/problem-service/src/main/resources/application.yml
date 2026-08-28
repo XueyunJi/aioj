@@ -1,0 +1,99 @@
+server:
+  port: ${SERVER_PORT:8202}
+
+spring:
+  application:
+    name: ai-oj-problem-service
+  config:
+    import: optional:nacos:${spring.application.name}.yml
+  datasource:
+    url: ${MYSQL_URL:jdbc:mysql://localhost:3306/ai_oj_next?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai}
+    username: ${MYSQL_USER:aioj}
+    password: ${MYSQL_PASSWORD:change-me}
+    hikari:
+      maximum-pool-size: ${PROBLEM_DB_POOL_MAX:8}
+      minimum-idle: ${PROBLEM_DB_POOL_MIN_IDLE:2}
+      connection-timeout: ${DB_CONNECTION_TIMEOUT_MS:5000}
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_DEFAULT_USER:guest}
+    password: ${RABBITMQ_DEFAULT_PASS:guest}
+    listener:
+      simple:
+        acknowledge-mode: manual
+  flyway:
+    enabled: ${FLYWAY_ENABLED:false}
+    clean-disabled: true
+  servlet:
+    multipart:
+      max-file-size: ${AIOJ_TESTCASE_MULTIPART_MAX_FILE_SIZE:8MB}
+      max-request-size: ${AIOJ_TESTCASE_MULTIPART_MAX_REQUEST_SIZE:50MB}
+  cloud:
+    nacos:
+      discovery:
+        enabled: ${NACOS_ENABLED:false}
+        server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+      config:
+        enabled: ${NACOS_ENABLED:false}
+        server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+        file-extension: yml
+    sentinel:
+      transport:
+        dashboard: ${SENTINEL_DASHBOARD:127.0.0.1:8858}
+
+aioj:
+  internal:
+    api-token: ${AIOJ_INTERNAL_API_TOKEN}
+  plagiarism:
+    ai-service-uri: ${AI_SERVICE_URI:http://localhost:8204}
+    internal-api-token: ${AIOJ_INTERNAL_API_TOKEN}
+    max-fragment-excerpt-chars: ${AIOJ_PLAGIARISM_MAX_FRAGMENT_EXCERPT_CHARS:1200}
+    executor-pool-size: ${AIOJ_PLAGIARISM_EXECUTOR_POOL_SIZE:2}
+  operations:
+    artifact-root: ${AIOJ_OPERATION_ARTIFACT_ROOT:${user.home}/.ai-oj-next/operation-artifacts}
+    lease-duration: ${AIOJ_OPERATION_LEASE_DURATION:5m}
+    poll-millis: ${AIOJ_OPERATION_POLL_MILLIS:5000}
+    executor-pool-size: ${AIOJ_OPERATION_EXECUTOR_POOL_SIZE:2}
+    poll-batch-size: ${AIOJ_OPERATION_POLL_BATCH_SIZE:3}
+    worker-enabled: ${AIOJ_OPERATION_WORKER_ENABLED:true}
+  contest:
+    ai-guard-grace-seconds: ${AIOJ_CONTEST_AI_GUARD_GRACE_SECONDS:600}
+  contest-invitation-dispatch:
+    concurrency: ${AIOJ_CONTEST_INVITATION_DISPATCH_CONCURRENCY:2}
+    batch-size: ${AIOJ_CONTEST_INVITATION_DISPATCH_BATCH_SIZE:25}
+    poll-millis: ${AIOJ_CONTEST_INVITATION_DISPATCH_POLL_MILLIS:5000}
+  testcase:
+    storage-root: ${AIOJ_TESTCASE_STORAGE_ROOT:${user.home}/.ai-oj-next/testcases}
+    max-package-bytes: ${AIOJ_TESTCASE_MAX_PACKAGE_BYTES:52428800}
+    chunk-size-bytes: ${AIOJ_TESTCASE_CHUNK_SIZE_BYTES:4194304}
+    max-case-file-bytes: ${AIOJ_TESTCASE_MAX_CASE_FILE_BYTES:8388608}
+    max-uncompressed-bytes: ${AIOJ_TESTCASE_MAX_UNCOMPRESSED_BYTES:52428800}
+    max-entry-count: ${AIOJ_TESTCASE_MAX_ENTRY_COUNT:2000}
+  security:
+    jwt:
+      issuer: ${JWT_ISSUER:ai-oj-next}
+      hmac-secret: ${JWT_HMAC_SECRET:replace-with-at-least-32-bytes-dev-secret}
+      private-key-pem: ${JWT_PRIVATE_KEY_PEM:}
+      public-key-pem: ${JWT_PUBLIC_KEY_PEM:}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: ${MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE:health}
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+springdoc:
+  api-docs:
+    enabled: ${SPRINGDOC_ENABLED:false}
+  swagger-ui:
+    enabled: ${SPRINGDOC_ENABLED:false}

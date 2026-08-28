@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+command_text=${SSH_ORIGINAL_COMMAND:-}
+if [[ $command_text =~ ^deploy[[:space:]]+(v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?)[[:space:]]+([0-9a-f]{64})$ ]]; then
+  exec /usr/local/sbin/aioj-deploy "${BASH_REMATCH[1]}" "${BASH_REMATCH[3]}"
+fi
+
+printf 'Rejected deployment command.\n' >&2
+exit 64

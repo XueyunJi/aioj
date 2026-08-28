@@ -1,0 +1,153 @@
+server:
+  port: ${SERVER_PORT:8204}
+
+spring:
+  application:
+    name: ai-oj-ai-service
+  config:
+    import: optional:nacos:${spring.application.name}.yml
+  mvc:
+    async:
+      # SSE chat/draft streams legitimately run for minutes while the provider generates;
+      # without an explicit value the container default (~30s) silently truncates them.
+      request-timeout: ${AI_ASYNC_REQUEST_TIMEOUT_MS:600000}
+  datasource:
+    url: ${MYSQL_URL:jdbc:mysql://localhost:3306/ai_oj_next?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai}
+    username: ${MYSQL_USER:aioj}
+    password: ${MYSQL_PASSWORD:change-me}
+    hikari:
+      maximum-pool-size: ${AI_DB_POOL_MAX:4}
+      minimum-idle: ${AI_DB_POOL_MIN_IDLE:1}
+      connection-timeout: ${DB_CONNECTION_TIMEOUT_MS:5000}
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+  flyway:
+    enabled: ${FLYWAY_ENABLED:false}
+    clean-disabled: true
+  cloud:
+    nacos:
+      discovery:
+        enabled: ${NACOS_ENABLED:false}
+        server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+      config:
+        enabled: ${NACOS_ENABLED:false}
+        server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+        file-extension: yml
+    sentinel:
+      transport:
+        dashboard: ${SENTINEL_DASHBOARD:127.0.0.1:8858}
+
+aioj:
+  internal:
+    api-token: ${AIOJ_INTERNAL_API_TOKEN}
+  security:
+    jwt:
+      issuer: ${JWT_ISSUER:ai-oj-next}
+      hmac-secret: ${JWT_HMAC_SECRET:replace-with-at-least-32-bytes-dev-secret}
+      private-key-pem: ${JWT_PRIVATE_KEY_PEM:}
+      public-key-pem: ${JWT_PUBLIC_KEY_PEM:}
+  ai:
+    provider: deepseek
+    base-url: ${DEEPSEEK_BASE_URL:https://api.deepseek.com/chat/completions}
+    api-key: ${DEEPSEEK_API_KEY:}
+    model: ${DEEPSEEK_MODEL:deepseek-v4-pro}
+    problem-service-uri: ${PROBLEM_SERVICE_URI:http://localhost:8202}
+    judge-worker-uri: ${JUDGE_WORKER_URI:http://localhost:8203}
+    problem-draft:
+      max-repair-attempts: ${AI_PROBLEM_DRAFT_MAX_REPAIR_ATTEMPTS:5}
+      testcase-artifact-storage-root: ${AI_PROBLEM_DRAFT_TESTCASE_ARTIFACT_ROOT:${user.home}/.ai-oj-next/ai-draft-testcase-artifacts}
+      max-official-case-bytes: ${AI_PROBLEM_DRAFT_MAX_OFFICIAL_CASE_BYTES:8388608}
+      max-official-package-bytes: ${AI_PROBLEM_DRAFT_MAX_OFFICIAL_PACKAGE_BYTES:52428800}
+      allowed-tags:
+        - implementation
+        - math
+        - greedy
+        - dp
+        - binary_search
+        - graphs
+        - shortest_paths
+        - trees
+        - strings
+        - data_structures
+        - sorting
+        - sortings
+        - 数组
+        - 哈希
+        - 排序
+        - 实现
+        - 数学
+        - 贪心
+        - 动态规划
+        - 二分
+        - 图论
+        - 最短路
+        - 树
+        - 字符串
+        - 数据结构
+    daily-limit: ${AI_DAILY_LIMIT:50}
+    monthly-limit: ${AI_MONTHLY_LIMIT:1000}
+    http:
+      connect-timeout-ms: ${AI_HTTP_CONNECT_TIMEOUT_MS:10000}
+      read-timeout-ms: ${AI_HTTP_READ_TIMEOUT_MS:300000}
+    capacity:
+      chat-core-pool-size: ${AI_CHAT_CORE_POOL_SIZE:4}
+      chat-max-pool-size: ${AI_CHAT_MAX_POOL_SIZE:8}
+      chat-queue-capacity: ${AI_CHAT_QUEUE_CAPACITY:64}
+      student-assistant-concurrency: ${AI_STUDENT_ASSISTANT_CONCURRENCY:8}
+      problem-draft-concurrency: ${AI_PROBLEM_DRAFT_CONCURRENCY:2}
+      intent-memory-concurrency: ${AI_INTENT_MEMORY_CONCURRENCY:4}
+      batch-report-concurrency: ${AI_BATCH_REPORT_CONCURRENCY:1}
+    deepseek:
+      thinking-enabled: ${DEEPSEEK_THINKING_ENABLED:false}
+      reasoning-effort: ${DEEPSEEK_REASONING_EFFORT:high}
+    intent:
+      enabled: ${AI_INTENT_ENABLED:true}
+      base-url: ${DEEPSEEK_INTENT_BASE_URL:${DEEPSEEK_BASE_URL:https://api.deepseek.com/chat/completions}}
+      api-key: ${DEEPSEEK_API_KEY:}
+      model: ${DEEPSEEK_INTENT_MODEL:${DEEPSEEK_MODEL:deepseek-v4-pro}}
+      max-context-chars: ${AI_INTENT_MAX_CONTEXT_CHARS:6000}
+    embedding:
+      enabled: ${AI_EMBEDDING_ENABLED:true}
+      base-url: ${AI_EMBEDDING_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode/v1/embeddings}
+      api-key: ${AI_EMBEDDING_API_KEY:}
+      model: ${AI_EMBEDDING_MODEL:text-embedding-v3}
+      dimension: ${AI_EMBEDDING_DIMENSION:1024}
+    problem-service-connect-timeout-ms: ${AI_PROBLEM_SERVICE_CONNECT_TIMEOUT_MS:2000}
+    problem-service-read-timeout-ms: ${AI_PROBLEM_SERVICE_READ_TIMEOUT_MS:5000}
+    problem-service-guard-cache-ttl-ms: ${AI_PROBLEM_SERVICE_GUARD_CACHE_TTL_MS:30000}
+    recall:
+      cooldown-window-minutes: ${AI_MEMORY_RECALL_COOLDOWN_WINDOW_MINUTES:30}
+      cooldown-penalty: ${AI_MEMORY_RECALL_COOLDOWN_PENALTY:0.35}
+      confirmed-boost: ${AI_MEMORY_RECALL_CONFIRMED_BOOST:0.10}
+    context:
+      estimator-ewma-alpha: ${AI_CONTEXT_ESTIMATOR_EWMA_ALPHA:0.20}
+    contest-leak-guard:
+      enabled: ${AI_CONTEST_LEAK_GUARD_ENABLED:true}
+      match-threshold: ${AI_CONTEST_GUARD_MATCH_THRESHOLD:0.75}
+      recall-threshold: ${AI_CONTEST_GUARD_RECALL_THRESHOLD:0.45}
+    memory-jobs:
+      enabled: ${AI_MEMORY_JOBS_ENABLED:true}
+      poll-interval-ms: ${AI_MEMORY_JOBS_POLL_INTERVAL_MS:5000}
+      batch-size: ${AI_MEMORY_JOBS_BATCH_SIZE:8}
+      lease-seconds: ${AI_MEMORY_JOBS_LEASE_SECONDS:60}
+      max-attempts: ${AI_MEMORY_JOBS_MAX_ATTEMPTS:3}
+      backoff-base-seconds: ${AI_MEMORY_JOBS_BACKOFF_BASE_SECONDS:30}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: ${MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE:health}
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+springdoc:
+  api-docs:
+    enabled: ${SPRINGDOC_ENABLED:false}
+  swagger-ui:
+    enabled: ${SPRINGDOC_ENABLED:false}

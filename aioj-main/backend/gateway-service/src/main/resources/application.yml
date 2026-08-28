@@ -1,0 +1,79 @@
+server:
+  port: ${SERVER_PORT:8101}
+
+spring:
+  application:
+    name: ai-oj-gateway-service
+  config:
+    import: optional:nacos:${spring.application.name}.yml
+  cloud:
+    nacos:
+      discovery:
+        enabled: ${NACOS_ENABLED:false}
+        server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+      config:
+        enabled: ${NACOS_ENABLED:false}
+        server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+        file-extension: yml
+    sentinel:
+      filter:
+        enabled: false
+      transport:
+        dashboard: ${SENTINEL_DASHBOARD:127.0.0.1:8858}
+    gateway:
+      server:
+        webflux:
+          httpclient:
+            response-timeout: ${GATEWAY_RESPONSE_TIMEOUT:240s}
+            connect-timeout: ${GATEWAY_CONNECT_TIMEOUT_MS:10000}
+      default-filters:
+        - PreserveHostHeader
+      globalcors:
+        cors-configurations:
+          "[/**]":
+            allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:5176,http://127.0.0.1:5173,http://127.0.0.1:5174,http://127.0.0.1:5175,http://127.0.0.1:5176}
+            allowed-methods: "*"
+            allowed-headers: "*"
+            exposed-headers: "Authorization,X-Trace-Id"
+            allow-credentials: true
+      routes:
+        - id: auth-service
+          uri: ${AUTH_SERVICE_URI:http://localhost:8201}
+          predicates:
+            - Path=/api/v1/auth/**,/api/v1/users/**,/api/v1/admin/users/**,/api/v1/admin/roles/**,/api/v1/classes/**,/api/v1/diagnostics/**
+          filters:
+            - StripPrefix=2
+        - id: problem-service
+          uri: ${PROBLEM_SERVICE_URI:http://localhost:8202}
+          predicates:
+            - Path=/api/v1/problems/**,/api/v1/problem-sets/**,/api/v1/submissions/**,/api/v1/contests/**,/api/v1/notifications/**,/api/v1/admin/submissions/**,/api/v1/admin/operation-jobs/**,/api/v1/admin/audit-events/**
+          filters:
+            - StripPrefix=2
+        - id: ai-service
+          uri: ${AI_SERVICE_URI:http://localhost:8204}
+          predicates:
+            - Path=/api/v1/ai/**,/api/v1/admin/problem-drafts/**,/api/v1/admin/problem-draft-generation-jobs,/api/v1/admin/problem-draft-generation-jobs/**,/api/v1/admin/ai-model-configs/**,/api/v1/admin/ai-guard-decisions/**,/api/v1/admin/ai/**
+          filters:
+            - StripPrefix=2
+          metadata:
+            response-timeout: ${AI_GATEWAY_RESPONSE_TIMEOUT_MS:900000}
+            connect-timeout: ${GATEWAY_CONNECT_TIMEOUT_MS:10000}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: ${MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE:health}
+  endpoint:
+    health:
+      probes:
+        enabled: true
+    gateway:
+      access: read_only
+
+springdoc:
+  api-docs:
+    enabled: ${SPRINGDOC_ENABLED:false}
+  swagger-ui:
+    enabled: ${SPRINGDOC_ENABLED:false}
+    path: /swagger-ui.html

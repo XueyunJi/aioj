@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-oj-next.local/schemas/problem-draft.schema.json",
+  "title": "ProblemDraft",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "title",
+    "difficulty",
+    "statement",
+    "notes",
+    "standardSolutionLanguage",
+    "standardSolutionCode",
+    "testcaseGeneratorPython",
+    "generationPlan",
+    "tags",
+    "testCases",
+    "timeLimitMillis",
+    "memoryLimitKb"
+  ],
+  "properties": {
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
+    },
+    "difficulty": {
+      "type": "string",
+      "enum": ["EASY", "MEDIUM", "HARD", "CHALLENGE"]
+    },
+    "cfRating": {
+      "type": "integer",
+      "minimum": 800,
+      "maximum": 3500
+    },
+    "statement": {
+      "type": "string",
+      "minLength": 1
+    },
+    "notes": {
+      "type": "string",
+      "minLength": 1
+    },
+    "standardSolutionLanguage": {
+      "type": "string",
+      "enum": ["cpp", "python", "java"]
+    },
+    "standardSolutionCode": {
+      "type": "string",
+      "minLength": 1
+    },
+    "referenceSolutionLanguage": {
+      "type": "string",
+      "enum": ["cpp", "python", "java"]
+    },
+    "referenceSolutionCode": {
+      "type": "string",
+      "minLength": 1
+    },
+    "testcaseGeneratorPython": {
+      "type": "string",
+      "minLength": 1
+    },
+    "stressTestcaseGeneratorPython": {
+      "type": "string",
+      "minLength": 1
+    },
+    "generationPlan": {
+      "type": "string",
+      "minLength": 1
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "testCases": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["input", "expectedOutput", "sample"],
+        "properties": {
+          "input": {
+            "type": "string",
+            "minLength": 1
+          },
+          "expectedOutput": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sample": {
+            "const": true
+          }
+        }
+      }
+    },
+    "timeLimitMillis": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "memoryLimitKb": {
+      "type": "integer",
+      "minimum": 1
+    }
+  }
+}

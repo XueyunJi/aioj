@@ -1,0 +1,66 @@
+server:
+  port: ${SERVER_PORT:8201}
+
+spring:
+  application:
+    name: ai-oj-auth-service
+  config:
+    import: optional:nacos:${spring.application.name}.yml
+  datasource:
+    url: ${MYSQL_URL:jdbc:mysql://localhost:3306/ai_oj_next?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai}
+    username: ${MYSQL_USER:aioj}
+    password: ${MYSQL_PASSWORD:change-me}
+    hikari:
+      maximum-pool-size: ${AUTH_DB_POOL_MAX:4}
+      minimum-idle: ${AUTH_DB_POOL_MIN_IDLE:1}
+      connection-timeout: ${DB_CONNECTION_TIMEOUT_MS:5000}
+  flyway:
+    enabled: ${FLYWAY_ENABLED:true}
+    clean-disabled: true
+  cloud:
+    nacos:
+      discovery:
+        enabled: ${NACOS_ENABLED:false}
+        server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+      config:
+        enabled: ${NACOS_ENABLED:false}
+        server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+        file-extension: yml
+    sentinel:
+      transport:
+        dashboard: ${SENTINEL_DASHBOARD:127.0.0.1:8858}
+
+aioj:
+  auth:
+    registration-enabled: ${AUTH_REGISTRATION_ENABLED:false}
+    login-attempt:
+      max-failures: ${AUTH_LOGIN_MAX_FAILURES:5}
+      window: ${AUTH_LOGIN_WINDOW:PT15M}
+      lock-duration: ${AUTH_LOGIN_LOCK_DURATION:PT15M}
+  security:
+    jwt:
+      issuer: ${JWT_ISSUER:ai-oj-next}
+      hmac-secret: ${JWT_HMAC_SECRET:replace-with-at-least-32-bytes-dev-secret}
+      private-key-pem: ${JWT_PRIVATE_KEY_PEM:}
+      public-key-pem: ${JWT_PUBLIC_KEY_PEM:}
+      access-ttl: ${JWT_ACCESS_TTL:PT2H}
+      refresh-ttl: ${JWT_REFRESH_TTL:P14D}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: ${MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE:health}
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: when_authorized
+
+springdoc:
+  api-docs:
+    enabled: ${SPRINGDOC_ENABLED:false}
+    path: /v3/api-docs
+  swagger-ui:
+    enabled: ${SPRINGDOC_ENABLED:false}
+    path: /swagger-ui.html

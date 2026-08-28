@@ -1,0 +1,58 @@
+.idea/
+.vscode/
+.playwright-mcp/
+.codex-smoke-logs/
+.qoder
+target/
+node_modules/
+dist/
+coverage/
+/.npm-cache/
+.env
+.env.local
+.env.*
+!.env.example
+.local/
+deploy/env/*.env
+!deploy/env/*.env.example
+*.log
+*.iml
+deploy/secrets/*.pem
+deploy/secrets/*.key
+deploy/data/
+
+# --- Added by archiving task ---
+# Graphify knowledge graph (regenerate locally with: graphify update .)
+graphify-out/
+
+# Frontend dev server stray logs
+apps/*/dev-server*.log
+apps/*/dev-server.err.log
+
+# Runtime logs
+logs/
+
+# Local visual QA artifacts
+/*-snapshot.md
+/problem-monaco-desktop.png
+/profile-memory-markdown.png
+
+# Local-only document preservation; deliberately excluded from the project history.
+/archive/
+
+# Release/deployment output is regenerated and must not enter source history.
+/release-out/
+/deploy-history/
+/backups/
+*.sql
+*.sql.gz
+*.tar
+*.tar.gz
+*.zip
+*.sha256
+
+# Flyway source migrations are application code, not database exports.
+!backend/api-contract/src/main/resources/db/migration/*.sql
+
+# Agent eval generated reports/filler SQL
+scripts/agent-eval/out/

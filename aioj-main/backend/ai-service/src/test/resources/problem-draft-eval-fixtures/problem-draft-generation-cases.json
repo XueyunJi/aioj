@@ -1,0 +1,140 @@
+[
+  {
+    "name": "hash-array-basic",
+    "request": {
+      "topic": "哈希,数组",
+      "difficulty": "MEDIUM",
+      "cfRating": 1400,
+      "algorithm": "哈希,数组",
+      "tags": ["哈希", "数组"],
+      "inputOutputSpec": "输入一个数组并回答重复元素相关问题。",
+      "dataConstraints": "n <= 200000",
+      "qualityRequirements": "样例必须覆盖无重复和有重复。",
+      "standardSolutionLanguage": "cpp",
+      "targetHiddenCaseCount": 12,
+      "enableAutoRepair": false,
+      "enableReferenceCheck": false
+    },
+    "expectedMinimumGate": "PLAN_ACCEPTED",
+    "expectedRiskCategory": "NONE",
+    "expectReferenceCheck": false,
+    "expectComplexityReport": false,
+    "expectReferenceReport": false,
+    "expectedVerificationStatus": "EXECUTION_VERIFIED"
+  },
+  {
+    "name": "segment-tree-sorting",
+    "request": {
+      "topic": "线段树,排序",
+      "difficulty": "HARD",
+      "cfRating": 1800,
+      "algorithm": "线段树,排序",
+      "tags": ["线段树", "排序"],
+      "inputOutputSpec": "输入区间更新和查询操作，输出每次查询答案。",
+      "dataConstraints": "n,q <= 200000",
+      "qualityRequirements": "需要卡住朴素逐点更新。",
+      "standardSolutionLanguage": "cpp",
+      "targetHiddenCaseCount": 16,
+      "enableAutoRepair": false,
+      "enableReferenceCheck": true
+    },
+    "expectedMinimumGate": "PLAN_ACCEPTED",
+    "expectedRiskCategory": "NONE",
+    "expectReferenceCheck": true,
+    "expectComplexityReport": true,
+    "expectReferenceReport": true,
+    "expectedVerificationStatus": "EXECUTION_VERIFIED"
+  },
+  {
+    "name": "interval-query",
+    "request": {
+      "topic": "区间查询",
+      "difficulty": "HARD",
+      "cfRating": 1700,
+      "algorithm": "前缀和,二分",
+      "tags": ["区间查询"],
+      "inputOutputSpec": "输入数组和多个区间查询，输出满足条件的区间数量。",
+      "dataConstraints": "n,q <= 200000",
+      "qualityRequirements": "覆盖空区间、边界区间和全区间。",
+      "standardSolutionLanguage": "cpp",
+      "targetHiddenCaseCount": 14,
+      "enableAutoRepair": false,
+      "enableReferenceCheck": true
+    },
+    "expectedMinimumGate": "PLAN_ACCEPTED",
+    "expectedRiskCategory": "NONE",
+    "expectReferenceCheck": true,
+    "expectComplexityReport": true,
+    "expectReferenceReport": true,
+    "expectedVerificationStatus": "EXECUTION_VERIFIED"
+  },
+  {
+    "name": "shortest-path",
+    "request": {
+      "topic": "图论最短路",
+      "difficulty": "HARD",
+      "cfRating": 1900,
+      "algorithm": "最短路,Dijkstra",
+      "tags": ["图论", "最短路"],
+      "inputOutputSpec": "输入带权图和询问，输出最短距离。",
+      "dataConstraints": "n,m <= 200000",
+      "qualityRequirements": "需要覆盖不可达、多条边和大权值。",
+      "standardSolutionLanguage": "cpp",
+      "targetHiddenCaseCount": 18,
+      "enableAutoRepair": false,
+      "enableReferenceCheck": true
+    },
+    "expectedMinimumGate": "PLAN_ACCEPTED",
+    "expectedRiskCategory": "NONE",
+    "expectReferenceCheck": true,
+    "expectComplexityReport": true,
+    "expectReferenceReport": true,
+    "expectedVerificationStatus": "EXECUTION_VERIFIED"
+  },
+  {
+    "name": "knapsack-dp",
+    "request": {
+      "topic": "DP 背包",
+      "difficulty": "MEDIUM",
+      "cfRating": 1600,
+      "algorithm": "动态规划,背包",
+      "tags": ["动态规划", "背包"],
+      "inputOutputSpec": "输入物品体积价值和容量，输出最大价值。",
+      "dataConstraints": "n <= 2000, capacity <= 2000",
+      "qualityRequirements": "覆盖容量为 0、物品无法选择和必须滚动数组的情况。",
+      "standardSolutionLanguage": "cpp",
+      "targetHiddenCaseCount": 12,
+      "enableAutoRepair": false,
+      "enableReferenceCheck": true
+    },
+    "expectedMinimumGate": "PLAN_ACCEPTED",
+    "expectedRiskCategory": "NONE",
+    "expectReferenceCheck": true,
+    "expectComplexityReport": false,
+    "expectReferenceReport": true,
+    "expectedVerificationStatus": "EXECUTION_VERIFIED"
+  },
+  {
+    "name": "high-rating-complexity-trap",
+    "request": {
+      "topic": "高 rating 复杂度陷阱题",
+      "difficulty": "HARD",
+      "cfRating": 2100,
+      "algorithm": "数据结构,贪心",
+      "tags": ["数据结构", "贪心"],
+      "inputOutputSpec": "输入大量事件，输出最优调度结果。",
+      "dataConstraints": "n <= 200000",
+      "qualityRequirements": "必须卡住 O(n^2) 暴力。",
+      "standardSolutionLanguage": "cpp",
+      "targetHiddenCaseCount": 20,
+      "enableAutoRepair": false,
+      "enableReferenceCheck": true
+    },
+    "expectedMinimumGate": "PLAN_ACCEPTED",
+    "expectedRiskCategory": "COMPLEXITY",
+    "expectReferenceCheck": true,
+    "expectComplexityReport": true,
+    "expectReferenceReport": true,
+    "expectedVerificationStatus": "FAILED"
+  }
+]
