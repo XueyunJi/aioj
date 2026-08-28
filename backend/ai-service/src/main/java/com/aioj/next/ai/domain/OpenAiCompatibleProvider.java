@@ -41,7 +41,9 @@ import java.util.Optional;
 @Component
 public class OpenAiCompatibleProvider implements AiProvider {
     private static final Logger log = LoggerFactory.getLogger(OpenAiCompatibleProvider.class);
-    static final int PROBLEM_DRAFT_FINAL_MAX_TOKENS = 6400;
+    // A complete draft contains the statement, solution, samples and an embedded
+    // testcase generator. Regeneration must have enough room to return all of it.
+    static final int PROBLEM_DRAFT_FINAL_MAX_TOKENS = 16000;
 
     private static final String CHAT_SYSTEM_PROMPT = """
             你是 AI-OJ 的算法学习导师。你的目标是帮助学生真正理解算法题，而不是默认替学生完成答案。
@@ -334,8 +336,25 @@ public class OpenAiCompatibleProvider implements AiProvider {
         try {
             return parseProblemDraft(id, result);
         } catch (Exception ex) {
-            return invalidProblemDraft(id, parentDraft.title(), parentDraft.difficulty(),
-                    validationErrors("Provider returned invalid regenerated draft JSON", ex), result);
+            // Regeneration must get the same schema-repair opportunity as initial
+            // generation. A provider may return fenced/truncated JSON on the first
+            // attempt; retry once with the exact invalid payload and parser error.
+            try {
+                log.warn("Regenerated draft JSON rejected; attempting schema repair: draftId={}, responseChars={}, completionTokens={}, error={}",
+                        id, result.content() == null ? 0 : result.content().length(), result.completionTokens(),
+                        conciseError(ex));
+                CompletionResult repaired = completeProblemDraftJson(config, List.of(
+                        message("system", problemDraftSystemPrompt()),
+                        message("user", problemDraftRepairPrompt(result.content(), ex.getMessage()))
+                ), 0.05, PROBLEM_DRAFT_FINAL_MAX_TOKENS);
+                return parseProblemDraft(id, combineUsage(repaired, result));
+            } catch (Exception repairEx) {
+                log.warn("Regenerated draft JSON repair rejected: draftId={}, originalResponseChars={}, error={}",
+                        id, result.content() == null ? 0 : result.content().length(), conciseError(repairEx));
+                return invalidProblemDraft(id, parentDraft.title(), parentDraft.difficulty(),
+                        validationErrors("Provider returned invalid regenerated draft JSON", repairEx),
+                        combineUsage(result));
+            }
         }
     }
 
@@ -1591,7 +1610,16 @@ public class OpenAiCompatibleProvider implements AiProvider {
                 上一次输出不能被系统解析或字段不完整。请修复为严格 JSON 对象，字段必须齐全，且不要输出 JSON 外文本。
                 解析/校验错误：%s
                 <INVALID_OUTPUT>%s</INVALID_OUTPUT>
-                """.formatted(safeOneLine(error), safeBlock(invalidJson, 12000));
+                """.formatted(safeOneLine(error), safeBlock(invalidJson, 50000));
+    }
+
+    private String conciseError(Exception ex) {
+        if (ex == null) {
+            return "unknown";
+        }
+        String message = ex.getMessage();
+        return ex.getClass().getSimpleName() + ": "
+                + safeOneLine(message == null || message.isBlank() ? "no message" : message);
     }
 
     private String problemDraftRepairSystemPrompt() {

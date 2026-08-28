@@ -1,4 +1,4 @@
-name: ${COMPOSE_PROJECT_NAME:-aioj-local}
+name: ai-oj-next
 
 services:
   mysql:
@@ -19,6 +19,12 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
     mem_limit: 640m
     cpus: "0.75"
 
@@ -37,6 +43,12 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
     mem_limit: 96m
     cpus: "0.25"
 
@@ -52,10 +64,16 @@ services:
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq
     healthcheck:
-      test: ["CMD", "gosu", "rabbitmq", "rabbitmq-diagnostics", "-q", "check_running"]
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 10s
       timeout: 5s
       retries: 10
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
     mem_limit: 256m
     cpus: "0.50"
 
@@ -83,6 +101,12 @@ services:
       interval: 15s
       timeout: 8s
       retries: 20
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
     mem_limit: 512m
     cpus: "0.50"
 
@@ -91,6 +115,12 @@ services:
     profiles: ["observability", "infra"]
     ports:
       - "127.0.0.1:8858:8858"
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
     mem_limit: 192m
     cpus: "0.25"
 
@@ -101,6 +131,12 @@ services:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
     ports:
       - "127.0.0.1:9090:9090"
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
     mem_limit: 192m
     cpus: "0.25"
 
@@ -109,6 +145,12 @@ services:
     profiles: ["observability"]
     ports:
       - "127.0.0.1:3000:3000"
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
     mem_limit: 192m
     cpus: "0.25"
 
@@ -132,6 +174,7 @@ services:
       GATEWAY_RESPONSE_TIMEOUT: ${GATEWAY_RESPONSE_TIMEOUT:-240s}
       AI_GATEWAY_RESPONSE_TIMEOUT_MS: ${AI_GATEWAY_RESPONSE_TIMEOUT_MS:-900000}
       GATEWAY_CONNECT_TIMEOUT_MS: ${GATEWAY_CONNECT_TIMEOUT_MS:-10000}
+      JWT_HMAC_SECRET: ${JWT_HMAC_SECRET:-replace-with-at-least-32-bytes-dev-secret}
       MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: ${MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE:-health}
       SPRINGDOC_ENABLED: ${SPRINGDOC_ENABLED:-false}
     ports:
@@ -148,6 +191,12 @@ services:
       interval: 10s
       timeout: 5s
       retries: 12
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
     mem_limit: 320m
     cpus: "0.35"
 
@@ -182,6 +231,12 @@ services:
       interval: 10s
       timeout: 5s
       retries: 12
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
     mem_limit: 384m
     cpus: "0.35"
 
@@ -234,6 +289,12 @@ services:
       interval: 10s
       timeout: 5s
       retries: 12
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
     mem_limit: 640m
     cpus: "0.65"
 
@@ -298,6 +359,12 @@ services:
       interval: 10s
       timeout: 5s
       retries: 12
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
     mem_limit: 640m
     cpus: "0.65"
 
@@ -354,6 +421,12 @@ services:
       interval: 10s
       timeout: 5s
       retries: 12
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
     mem_limit: 384m
     cpus: "0.50"
 
@@ -381,6 +454,12 @@ services:
       interval: 10s
       timeout: 3s
       retries: 5
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
     mem_limit: 960m
     cpus: "1.20"
 
@@ -398,6 +477,12 @@ services:
     depends_on:
       gateway-service:
         condition: service_healthy
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
     mem_limit: 64m
     cpus: "0.10"
 
@@ -415,6 +500,12 @@ services:
     depends_on:
       gateway-service:
         condition: service_healthy
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
     mem_limit: 64m
     cpus: "0.10"
 
