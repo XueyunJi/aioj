@@ -17,13 +17,16 @@ jobs:
   frontend:
     name: React checks
     runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: aioj-main
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "24"
           cache: npm
-          cache-dependency-path: package-lock.json
+          cache-dependency-path: aioj-main/package-lock.json
       - run: npm ci --include=optional
       - run: npm run typecheck:react
       - run: npm run test:auth
@@ -40,7 +43,7 @@ jobs:
           distribution: temurin
           java-version: "17"
           cache: maven
-      - run: mvn -B -f backend/pom.xml test
+      - run: mvn -B -f aioj-main/backend/pom.xml test
 
   policy:
     name: Repository and deployment policy
@@ -54,10 +57,13 @@ jobs:
           node-version: "24"
       - name: Validate local Markdown links
         run: node scripts/ci/check-markdown-links.mjs
+        working-directory: aioj-main
       - name: Validate repository hygiene
         run: node scripts/ci/check-repository-hygiene.mjs
+        working-directory: aioj-main
       - name: Validate source-build Compose
         run: docker compose --env-file .env.example -f deploy/compose.yml config --quiet
+        working-directory: aioj-main
       - name: Validate image-only production Compose
         run: >-
           docker compose
@@ -65,6 +71,7 @@ jobs:
           --env-file deploy/env/deploy.env.example
           -f deploy/compose.production.yml
           config --quiet
+        working-directory: aioj-main
       - name: Gitleaks
         uses: gitleaks/gitleaks-action@dcedce43c6f43de0b836d1fe38946645c9c638dc # v2
         env:

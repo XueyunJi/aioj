@@ -86,13 +86,13 @@ jobs:
       - id: build
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
-          context: .
-          file: ${{ matrix.dockerfile }}
+          context: ./aioj-main
+          file: aioj-main/${{ matrix.dockerfile }}
           platforms: linux/amd64
           push: true
           tags: |
-            ghcr.io/mubai0628/aioj-${{ matrix.service }}:${{ needs.validate.outputs.tag }}
-            ghcr.io/mubai0628/aioj-${{ matrix.service }}:sha-${{ github.sha }}
+            ghcr.io/xueyunji/aioj-${{ matrix.service }}:${{ needs.validate.outputs.tag }}
+            ghcr.io/xueyunji/aioj-${{ matrix.service }}:sha-${{ github.sha }}
           build-args: ${{ matrix.build_args }}
           provenance: mode=max
           sbom: true
@@ -101,7 +101,7 @@ jobs:
       - name: Attest build provenance
         uses: actions/attest-build-provenance@96b4a1ef7235a096b17240c259729fdd70c83d45 # v2
         with:
-          subject-name: ghcr.io/mubai0628/aioj-${{ matrix.service }}
+          subject-name: ghcr.io/xueyunji/aioj-${{ matrix.service }}
           subject-digest: ${{ steps.build.outputs.digest }}
           push-to-registry: true
       - name: Write immutable image fragment
@@ -111,7 +111,7 @@ jobs:
           mkdir -p fragments
           jq -n \
             --arg service '${{ matrix.service }}' \
-            --arg image 'ghcr.io/mubai0628/aioj-${{ matrix.service }}' \
+            --arg image 'ghcr.io/xueyunji/aioj-${{ matrix.service }}' \
             --arg digest '${{ steps.build.outputs.digest }}' \
             '{service:$service,image:$image,digest:$digest}' \
             > "fragments/${{ matrix.service }}.json"
@@ -149,9 +149,9 @@ jobs:
           set -Eeuo pipefail
           mkdir -p release-out
           tar -czf release-out/deployment-bundle.tar.gz \
-            deploy/compose.production.yml deploy/env scripts/deploy
+            aioj-main/deploy/compose.production.yml aioj-main/deploy/env aioj-main/scripts/deploy
           bundle_sha=$(sha256sum release-out/deployment-bundle.tar.gz | awk '{print $1}')
-          node scripts/release/assemble-manifest.mjs \
+          node aioj-main/scripts/release/assemble-manifest.mjs \
             manifest-fragments "$TAG" "$GITHUB_SHA" "$bundle_sha" \
             release-out/image-manifest.json
           (cd release-out && sha256sum image-manifest.json > image-manifest.json.sha256)
@@ -189,8 +189,6 @@ jobs:
           printf '%s\n' "$DEPLOY_PRIVATE_KEY" > "$HOME/.ssh/aioj-deploy"
           printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
           chmod 0600 "$HOME/.ssh/aioj-deploy" "$HOME/.ssh/known_hosts"
-          # The remote gate returns curl's exit 56 only before any Compose state is changed.
-          # Never retry other failures because their server-side mutation point is unknown.
           for attempt in 1 2 3 4 5; do
             if ssh -T \
               -i "$HOME/.ssh/aioj-deploy" \
@@ -210,11 +208,9 @@ jobs:
             else
               status=$?
             fi
-
             if [[ $status -ne 56 || $attempt -eq 5 ]]; then
               exit "$status"
             fi
-
             delay=$((attempt * 15))
             printf 'Release asset download was interrupted; retrying deployment gate in %ss (attempt %s/5).\n' \
               "$delay" "$attempt"
