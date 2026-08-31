@@ -15,7 +15,7 @@ for (const file of fs.readdirSync(fragmentDirectory).filter((name) => name.endsW
   const fragment = JSON.parse(fs.readFileSync(path.join(fragmentDirectory, file), "utf8"));
   if (!expected.includes(fragment.service)) throw new Error(`unexpected service ${fragment.service}`);
   if (images[fragment.service]) throw new Error(`duplicate service ${fragment.service}`);
-  const expectedImage = `ghcr.io/mubai0628/aioj-${fragment.service}`;
+  const expectedImage = `ghcr.io/xueyunji/aioj-${fragment.service}`;
   if (fragment.image !== expectedImage) throw new Error(`unexpected image namespace for ${fragment.service}`);
   if (!/^sha256:[0-9a-f]{64}$/.test(fragment.digest)) throw new Error(`invalid digest for ${fragment.service}`);
   images[fragment.service] = `${fragment.image}@${fragment.digest}`;
