@@ -149,7 +149,7 @@ jobs:
           set -Eeuo pipefail
           mkdir -p release-out
           tar -czf release-out/deployment-bundle.tar.gz \
-            aioj-main/deploy/compose.production.yml aioj-main/deploy/env aioj-main/scripts/deploy
+            -C aioj-main deploy/compose.production.yml deploy/env scripts/deploy
           bundle_sha=$(sha256sum release-out/deployment-bundle.tar.gz | awk '{print $1}')
           node aioj-main/scripts/release/assemble-manifest.mjs \
             manifest-fragments "$TAG" "$GITHUB_SHA" "$bundle_sha" \

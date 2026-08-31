@@ -17,7 +17,7 @@ previous_env="$root/deploy.previous.env"
 compose_file="$root/compose.production.yml"
 history="$root/deploy-history"
 lock_file=/run/lock/aioj-deploy.lock
-release_url="https://github.com/Mubai0628/aioj/releases/download/$tag"
+release_url="https://github.com/XueyunJi/aioj/releases/download/$tag"
 work=$(mktemp -d "$root/.deploy-${tag}.XXXXXX")
 trap 'rm -rf -- "$work"' EXIT
 
@@ -38,7 +38,7 @@ jq -e --arg tag "$tag" '
   (.deploymentBundle.name == "deployment-bundle.tar.gz") and
   (.deploymentBundle.sha256 | test("^[0-9a-f]{64}$")) and
   (.images | keys | sort == ["ai","auth","gateway","judge-worker","problem","sandbox","web-admin","web-user"]) and
-  ([.images[] | test("^ghcr\\.io/mubai0628/aioj-(ai|auth|gateway|judge-worker|problem|sandbox|web-admin|web-user)@sha256:[0-9a-f]{64}$")] | all)
+  ([.images[] | test("^ghcr\\.io/xueyunji/aioj-(ai|auth|gateway|judge-worker|problem|sandbox|web-admin|web-user)@sha256:[0-9a-f]{64}$")] | all)
 ' "$work/image-manifest.json" >/dev/null || { printf 'release manifest validation failed\n' >&2; exit 65; }
 
 bundle_name=$(jq -r '.deploymentBundle.name' "$work/image-manifest.json")
