@@ -32,7 +32,7 @@ class SubmissionRequestFingerprintServiceTest {
         submission.setUserId(14L);
 
         service.record(submission, new SubmissionRequestMetadata("10.0.0.5:51234", "192.168.1.25, 10.0.0.5",
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/148.0.0.0 Safari/537.36"),
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/148.0.0.0 Safari/537.36", null),
                 Instant.parse("2026-06-08T01:00:00Z"));
 
         ArgumentCaptor<SubmissionRequestFingerprintEntity> captor = ArgumentCaptor.forClass(SubmissionRequestFingerprintEntity.class);

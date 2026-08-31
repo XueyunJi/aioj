@@ -31,8 +31,8 @@ jobs:
           set -Eeuo pipefail
           tag='${{ github.event.release.tag_name }}'
           [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
-          git fetch origin main
-          git merge-base --is-ancestor "$GITHUB_SHA" origin/main
+          git fetch origin master
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/master
           printf 'tag=%s\n' "$tag" >> "$GITHUB_OUTPUT"
 
   build:

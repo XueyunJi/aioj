@@ -207,6 +207,12 @@ public class DraftSandboxClient {
                         firstText(item.message(), "Accepted")))
                 .toList();
         int generatedInputCount = generatedInputCount(script, officialPackage);
+        if (generatedInputCount > benchmarkRuns.size()) {
+            warnings.add(new VerificationWarning("HIDDEN_CASES_PARTIAL_VERIFICATION",
+                    "verified first " + benchmarkRuns.size() + " of " + generatedInputCount
+                            + " generated hidden inputs",
+                    "testcaseGeneratorPython"));
+        }
         return new HiddenCaseVerificationResult(benchmarkRuns, generatedInputCount, officialPackage);
     }
 

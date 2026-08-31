@@ -50,6 +50,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.Objects;
 
 @Service
 public class SubmissionService {
@@ -113,6 +114,17 @@ public class SubmissionService {
         } else if (request.contestProblemId() != null) {
             throw new DomainException(ErrorCode.BAD_REQUEST, "Contest is required for contest problem submissions");
         }
+        String idempotencyKey = normalizeIdempotencyKey(metadata == null ? null : metadata.idempotencyKey());
+        if (idempotencyKey != null) {
+            SubmissionEntity existing = submissionMapper.selectOne(new LambdaQueryWrapper<SubmissionEntity>()
+                    .eq(SubmissionEntity::getUserId, userId)
+                    .eq(SubmissionEntity::getIdempotencyKey, scopedIdempotencyKey(userId, idempotencyKey))
+                    .last("LIMIT 1"));
+            if (existing != null) {
+                assertSameRequest(existing, request, language, contestContext);
+                return toResponse(existing, false, false);
+            }
+        }
         SubmissionEntity submission = new SubmissionEntity();
         submission.setProblemId(request.problemId());
         submission.setUserId(userId);
@@ -126,6 +138,7 @@ public class SubmissionService {
         submission.setVisibleToParticipant(true);
         submission.setLanguage(language);
         submission.setCode(request.code());
+        submission.setIdempotencyKey(idempotencyKey == null ? null : scopedIdempotencyKey(userId, idempotencyKey));
         submission.setStatus(SubmissionStatus.QUEUED);
         submission.setJudgeMessage("Queued for judging");
         submission.setRetryCount(0);
@@ -327,6 +340,35 @@ public class SubmissionService {
             throw new DomainException(ErrorCode.BAD_REQUEST, "Language is required");
         }
         return language.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private String normalizeIdempotencyKey(String value) {
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+        String normalized = value.trim();
+        if (normalized.length() > 96) {
+            throw new DomainException(ErrorCode.BAD_REQUEST, "Idempotency-Key is too long");
+        }
+        return normalized;
+    }
+
+    private String scopedIdempotencyKey(Long userId, String key) {
+        return userId + ":" + key;
+    }
+
+    private void assertSameRequest(SubmissionEntity existing, SubmissionCreateRequest request,
+                                   String language, ContestSubmissionContext contestContext) {
+        boolean same = Objects.equals(existing.getProblemId(), request.problemId())
+                && Objects.equals(existing.getLanguage(), language)
+                && Objects.equals(existing.getCode(), request.code())
+                && Objects.equals(existing.getContestId(), contestContext == null ? null : contestContext.contest().getId())
+                && Objects.equals(existing.getContestRunId(), contestContext == null || contestContext.contestRun() == null
+                ? null : contestContext.contestRun().getId())
+                && Objects.equals(existing.getContestProblemId(), contestContext == null ? null : contestContext.contestProblem().getId());
+        if (!same) {
+            throw new DomainException(ErrorCode.CONFLICT, "Idempotency-Key was already used for a different submission");
+        }
     }
 
     private String normalizeOptionalLanguage(String language) {

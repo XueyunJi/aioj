@@ -31,12 +31,22 @@ spring:
       globalcors:
         cors-configurations:
           "[/**]":
-            allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:5176,http://127.0.0.1:5173,http://127.0.0.1:5174,http://127.0.0.1:5175,http://127.0.0.1:5176}
+            allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5175,http://127.0.0.1:5175,http://localhost:5176,http://127.0.0.1:5176}
             allowed-methods: "*"
             allowed-headers: "*"
             exposed-headers: "Authorization,X-Trace-Id"
             allow-credentials: true
       routes:
+        - id: tutor-problem-service
+          uri: ${PROBLEM_SERVICE_URI:http://localhost:8202}
+          predicates:
+            - Path=/api/v1/tutor/capabilities,/api/v1/tutor/problems,/api/v1/tutor/problems/**,/api/v1/tutor/recommendations
+          filters:
+            - StripPrefix=2
+        - id: tutor-service
+          uri: ${TUTOR_SERVICE_URI:http://host.docker.internal:8600}
+          predicates:
+            - Path=/api/v1/tutor/**
         - id: auth-service
           uri: ${AUTH_SERVICE_URI:http://localhost:8201}
           predicates:

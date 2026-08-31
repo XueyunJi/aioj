@@ -119,7 +119,10 @@ public class AiModelCatalogClient {
             );
         }
         if ("moonshot".equals(normalizedProvider) || "kimi".equals(normalizedProvider) || ownedBy.toLowerCase(Locale.ROOT).contains("moonshot")) {
-            boolean kimiThinking = supportsReasoning || model.startsWith("kimi-k2.5") || model.startsWith("kimi-k2.6");
+            boolean kimiThinking = supportsReasoning
+                    || model.startsWith("kimi-k2.5")
+                    || model.startsWith("kimi-k2.6")
+                    || model.startsWith("kimi-k3");
             return new AiModelListResponse.ModelOption(
                     id,
                     ownedBy,

@@ -17,6 +17,8 @@ import com.aioj.next.contract.problem.ProblemTestcaseGeneratorResponse;
 import com.aioj.next.contract.problem.ProblemUpdateRequest;
 import com.aioj.next.contract.problem.ProblemVisibility;
 import com.aioj.next.contract.problem.TestCaseDto;
+import com.aioj.next.contract.problem.TutorProblemCapabilitiesResponse;
+import com.aioj.next.contract.problem.TutorProblemResponse;
 import com.aioj.next.problem.persistence.entity.ProblemEntity;
 import com.aioj.next.problem.persistence.entity.ProblemSolutionEntity;
 import com.aioj.next.problem.persistence.entity.ProblemTestcaseGeneratorEntity;
@@ -35,6 +37,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
@@ -66,6 +69,9 @@ public class ProblemCatalog {
     private final OperationAuditService auditService;
     private final JdbcTemplate jdbcTemplate;
     private final ContestProblemVisibilityService visibilityService;
+
+    @Value("${AIOJ_USER_BASE_URL:http://localhost:5175}")
+    private String aiojUserBaseUrl = "http://localhost:5175";
 
     public ProblemCatalog(ProblemMapper problemMapper, ProblemTestCaseMapper testCaseMapper,
                           ProblemSolutionMapper solutionMapper, ProblemTestcaseGeneratorMapper testcaseGeneratorMapper,
@@ -106,6 +112,43 @@ public class ProblemCatalog {
                         .apply(StringUtils.hasText(tag), "JSON_CONTAINS(tags, JSON_QUOTE({0}))", normalizeTag(tag)), sort));
         List<ProblemResponse> records = result.getRecords().stream().map(this::toResponse).toList();
         return new PageResponse<>(records, result.getTotal(), result.getCurrent(), result.getSize());
+    }
+
+    public TutorProblemCapabilitiesResponse tutorCapabilities() {
+        return new TutorProblemCapabilitiesResponse(
+                "v1",
+                ProblemVisibility.PUBLIC.name(),
+                "AIOJ_PROBLEM_TAGS",
+                List.of("search", "detail", "recommendations"),
+                List.of("NEWEST", "OLDEST", "DIFFICULTY_ASC", "DIFFICULTY_DESC"),
+                List.of("EASY", "MEDIUM", "HARD", "CHALLENGE"));
+    }
+
+    public PageResponse<TutorProblemResponse> tutorSearch(long page, long pageSize, String keyword,
+                                                            Difficulty difficulty, String tag, String sort) {
+        LambdaQueryWrapper<ProblemEntity> query = activeProblemQuery()
+                .eq(ProblemEntity::getVisibility, ProblemVisibility.PUBLIC);
+        String normalizedKeyword = keyword == null ? "" : keyword.trim();
+        if (StringUtils.hasText(normalizedKeyword)) {
+            query.and(nested -> nested.like(ProblemEntity::getTitle, normalizedKeyword)
+                    .or().apply("CAST(id AS CHAR) LIKE {0}", "%" + normalizedKeyword + "%"));
+        }
+        Page<ProblemEntity> result = problemMapper.selectPage(
+                new Page<>(normalizePage(page), normalizePageSize(pageSize)),
+                applySort(query.eq(difficulty != null, ProblemEntity::getDifficulty, difficulty)
+                        .apply(StringUtils.hasText(tag), "JSON_CONTAINS(tags, JSON_QUOTE({0}))", normalizeTag(tag)), sort));
+        return new PageResponse<>(result.getRecords().stream().map(this::toTutorResponse).toList(),
+                result.getTotal(), result.getCurrent(), result.getSize());
+    }
+
+    public TutorProblemResponse tutorDetail(Long id) {
+        ProblemEntity problem = problemMapper.selectOne(activeProblemQuery()
+                .eq(ProblemEntity::getId, id)
+                .eq(ProblemEntity::getVisibility, ProblemVisibility.PUBLIC));
+        if (problem == null) {
+            throw new DomainException(ErrorCode.NOT_FOUND, "Problem not found");
+        }
+        return toTutorResponse(problem);
     }
 
     private LambdaQueryWrapper<ProblemEntity> applySort(LambdaQueryWrapper<ProblemEntity> query, String sort) {
@@ -491,6 +534,22 @@ public class ProblemCatalog {
                 problem.getVisibility() == null ? ProblemVisibility.PUBLIC : problem.getVisibility(),
                 problem.getCreatedAt(), problem.getArchivedAt(),
                 problem.getDeletedAt(), problem.getDeletedBy());
+    }
+
+    public TutorProblemResponse toTutorResponse(ProblemEntity problem) {
+        ProblemResponse response = toResponse(problem);
+        Instant updatedAt = problem.getUpdatedAt() == null ? problem.getCreatedAt() : problem.getUpdatedAt();
+        return new TutorProblemResponse(problem.getId(), updatedAt == null ? "unknown" : updatedAt.toString(),
+                updatedAt, solveUrl(problem.getId()), response.title(), response.difficulty(), response.statement(), response.notes(),
+                response.tags(), response.samples(), response.timeLimitMillis(), response.memoryLimitKb());
+    }
+
+    private String solveUrl(Long problemId) {
+        String baseUrl = aiojUserBaseUrl == null ? "http://localhost:5175" : aiojUserBaseUrl.trim();
+        while (baseUrl.endsWith("/")) {
+            baseUrl = baseUrl.substring(0, baseUrl.length() - 1);
+        }
+        return baseUrl + "/problems/" + problemId;
     }
 
     private ProblemSolutionResponse toSolutionResponse(ProblemSolutionEntity solution) {

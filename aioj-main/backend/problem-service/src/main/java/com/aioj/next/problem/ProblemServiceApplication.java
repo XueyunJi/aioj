@@ -5,6 +5,7 @@ import com.aioj.next.problem.config.ContestProperties;
 import com.aioj.next.problem.config.InternalApiProperties;
 import com.aioj.next.problem.config.OperationProperties;
 import com.aioj.next.problem.config.TestcaseProperties;
+import com.aioj.next.problem.config.TutorIntegrationProperties;
 import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -15,7 +16,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @MapperScan("com.aioj.next.problem.persistence.mapper")
 @EnableScheduling
 @EnableConfigurationProperties({JwtProperties.class, TestcaseProperties.class, InternalApiProperties.class, OperationProperties.class,
-        ContestProperties.class})
+        ContestProperties.class, TutorIntegrationProperties.class})
 public class ProblemServiceApplication {
     public static void main(String[] args) {
         SpringApplication.run(ProblemServiceApplication.class, args);

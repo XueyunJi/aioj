@@ -8,6 +8,7 @@ import com.aioj.next.ai.domain.AiLearningProfileService;
 import com.aioj.next.ai.domain.AiMemoryService;
 import com.aioj.next.ai.domain.AiProvider;
 import com.aioj.next.ai.domain.AiQuotaService;
+import com.aioj.next.ai.domain.ProblemDraftTestcaseArtifactService;
 import com.aioj.next.ai.domain.ProblemDraftStore;
 import com.aioj.next.ai.domain.memory.AiMemoryCandidateService;
 import com.aioj.next.ai.domain.memory.AiMemoryDebugService;
@@ -35,6 +36,8 @@ class AiControllerConstructorInjectionTest {
             .withBean(AiMemoryCandidateService.class, () -> mock(AiMemoryCandidateService.class))
             .withBean(AiMemoryDebugService.class, () -> mock(AiMemoryDebugService.class))
             .withBean(AiMemoryReviewService.class, () -> mock(AiMemoryReviewService.class))
+            .withBean(ProblemDraftTestcaseArtifactService.class,
+                    () -> mock(ProblemDraftTestcaseArtifactService.class))
             .withBean(ProblemDraftStore.class, () -> mock(ProblemDraftStore.class))
             .withBean(AiAssistantResponseNormalizer.class, () -> mock(AiAssistantResponseNormalizer.class))
             .withBean(ObjectMapper.class, ObjectMapper::new)

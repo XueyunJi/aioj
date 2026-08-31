@@ -9,8 +9,8 @@ services:
     environment:
       MYSQL_DATABASE: ${MYSQL_DATABASE:-ai_oj_next}
       MYSQL_USER: ${MYSQL_USER:-aioj}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-change-me}
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-change-root-me}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD is required}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required}
     ports:
       - "127.0.0.1:3306:3306"
     volumes:

@@ -33,7 +33,8 @@ public class SubmissionController {
         SubmissionRequestMetadata metadata = new SubmissionRequestMetadata(
                 servletRequest.getRemoteAddr(),
                 servletRequest.getHeader("X-Forwarded-For"),
-                servletRequest.getHeader("User-Agent")
+                servletRequest.getHeader("User-Agent"),
+                servletRequest.getHeader("Idempotency-Key")
         );
         return ApiResponse.ok(submissionService.submit(request, metadata));
     }

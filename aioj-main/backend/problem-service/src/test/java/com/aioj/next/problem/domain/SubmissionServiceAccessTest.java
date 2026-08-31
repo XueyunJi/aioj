@@ -11,6 +11,7 @@ import com.aioj.next.contract.contest.ContestAiPolicyRequest;
 import com.aioj.next.contract.contest.ContestAiPolicyResponse;
 import com.aioj.next.contract.judge.JudgeTaskMessage;
 import com.aioj.next.contract.submission.SubmissionCreateRequest;
+import com.aioj.next.contract.submission.SubmissionResponse;
 import com.aioj.next.contract.submission.SubmissionScope;
 import com.aioj.next.contract.submission.SubmissionStatus;
 import com.aioj.next.problem.persistence.entity.ProblemEntity;
@@ -244,6 +245,57 @@ class SubmissionServiceAccessTest {
         verify(rabbitTemplate, times(3)).convertAndSend(anyString(), anyString(), captor.capture(), any(MessagePostProcessor.class));
         assertEquals(List.of(1000, 2500, 1500), captor.getAllValues().stream().map(JudgeTaskMessage::timeLimitMillis).toList());
         verify(problemCatalog, times(3)).effectiveTimeLimitMillis(any(ProblemEntity.class), anyString());
+    }
+
+    @Test
+    void sameUserAndIdempotencyKeyReturnsExistingSubmission() {
+        authenticate(91L, Role.STUDENT);
+        when(problemCatalog.findActive(1001L)).thenReturn(Optional.of(activeProblem()));
+        SubmissionEntity existing = practiceSubmission();
+        existing.setId(901L);
+        existing.setIdempotencyKey("91:tutor-submit-1");
+        when(submissionMapper.selectOne(any())).thenReturn(existing);
+
+        SubmissionResponse result = service.submit(new SubmissionCreateRequest(1001L, "cpp", "int main(){}", null, null, null),
+                new SubmissionRequestMetadata("127.0.0.1", null, "test", "tutor-submit-1"));
+
+        assertEquals(901L, result.id());
+        verify(submissionMapper, times(0)).insert(any(SubmissionEntity.class));
+        verifyNoInteractions(rabbitTemplate);
+    }
+
+    @Test
+    void reusingIdempotencyKeyWithDifferentPayloadIsRejected() {
+        authenticate(91L, Role.STUDENT);
+        when(problemCatalog.findActive(1001L)).thenReturn(Optional.of(activeProblem()));
+        SubmissionEntity existing = practiceSubmission();
+        existing.setIdempotencyKey("91:tutor-submit-1");
+        when(submissionMapper.selectOne(any())).thenReturn(existing);
+
+        DomainException exception = assertThrows(DomainException.class, () -> service.submit(
+                new SubmissionCreateRequest(1001L, "cpp", "different code", null, null, null),
+                new SubmissionRequestMetadata("127.0.0.1", null, "test", "tutor-submit-1")));
+
+        assertEquals(ErrorCode.CONFLICT, exception.errorCode());
+        verify(submissionMapper, times(0)).insert(any(SubmissionEntity.class));
+    }
+
+    @Test
+    void sameRawIdempotencyKeyIsScopedToCurrentUser() {
+        authenticate(92L, Role.STUDENT);
+        when(problemCatalog.findActive(1001L)).thenReturn(Optional.of(activeProblem()));
+        doAnswer(invocation -> {
+            SubmissionEntity submission = invocation.getArgument(0);
+            submission.setId(902L);
+            return 1;
+        }).when(submissionMapper).insert(any(SubmissionEntity.class));
+
+        service.submit(new SubmissionCreateRequest(1001L, "cpp", "int main(){}", null, null, null),
+                new SubmissionRequestMetadata("127.0.0.1", null, "test", "tutor-submit-1"));
+
+        ArgumentCaptor<SubmissionEntity> captor = ArgumentCaptor.forClass(SubmissionEntity.class);
+        verify(submissionMapper).insert(captor.capture());
+        assertEquals("92:tutor-submit-1", captor.getValue().getIdempotencyKey());
     }
 
     @Test

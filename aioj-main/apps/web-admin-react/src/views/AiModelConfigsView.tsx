@@ -527,7 +527,9 @@ function capabilityFor(scope: AiModelConfigScope, form: FormState, option?: AiMo
   }
   if (providerKind === "kimi") {
     const model = form.model.trim().toLowerCase();
-    const supportsThinking = model.startsWith("kimi-k2.5") || model.startsWith("kimi-k2.6");
+    const supportsThinking = model.startsWith("kimi-k2.5")
+      || model.startsWith("kimi-k2.6")
+      || model.startsWith("kimi-k3");
     return {
       providerKind: "kimi",
       supportsJsonOutput: true,

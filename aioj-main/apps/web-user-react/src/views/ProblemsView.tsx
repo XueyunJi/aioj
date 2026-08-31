@@ -122,7 +122,7 @@ export function ProblemsView() {
                   </div>
                   <h2 className="line-clamp-2 text-balance text-lg font-semibold text-[var(--oj-ink)]">{problem.title}</h2>
                   <p className="mt-3 line-clamp-3 text-sm leading-6 text-[var(--oj-ink-muted)]">
-                    {problem.notes || t("problems.openDetailFallback")}
+                    {problem.statement || t("problems.openDetailFallback")}
                   </p>
                 </div>
                 <div className="mt-5 flex flex-wrap items-center justify-between gap-3">

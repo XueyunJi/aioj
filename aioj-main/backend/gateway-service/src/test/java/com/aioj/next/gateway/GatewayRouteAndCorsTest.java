@@ -34,6 +34,8 @@ class GatewayRouteAndCorsTest {
         List<RouteDefinition> routes = routeDefinitionLocator.getRouteDefinitions().collectList().block();
         assertNotNull(routes);
         Set<String> ids = routes.stream().map(RouteDefinition::getId).collect(Collectors.toSet());
+        assertTrue(ids.contains("tutor-service"), "tutor-service route missing");
+        assertTrue(ids.contains("tutor-problem-service"), "tutor-problem-service route missing");
         assertTrue(ids.contains("auth-service"), "auth-service route missing");
         assertTrue(ids.contains("problem-service"), "problem-service route missing");
         assertTrue(ids.contains("ai-service"), "ai-service route missing");
@@ -64,6 +66,30 @@ class GatewayRouteAndCorsTest {
         assertTrue(patterns.contains("/api/v1/admin/users/**"), patterns);
         assertTrue(patterns.contains("/api/v1/admin/roles/**"), patterns);
         assertTrue(patterns.contains("/api/v1/diagnostics/**"), patterns);
+    }
+
+    @Test
+    void tutorRoutePreservesTutorApiPrefix() {
+        String patterns = pathPatterns("tutor-service");
+        assertEquals("/api/v1/tutor/**", patterns);
+    }
+
+    @Test
+    void tutorProblemRoutesGoToProblemService() {
+        String patterns = pathPatterns("tutor-problem-service");
+        assertTrue(patterns.contains("/api/v1/tutor/capabilities"), patterns);
+        assertTrue(patterns.contains("/api/v1/tutor/problems"), patterns);
+    }
+
+    @Test
+    void tutorRouteDefaultsToHostTutorService() {
+        List<RouteDefinition> routes = routeDefinitionLocator.getRouteDefinitions().collectList().block();
+        assertNotNull(routes);
+        RouteDefinition tutor = routes.stream()
+                .filter(route -> "tutor-service".equals(route.getId()))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("tutor-service route missing"));
+        assertEquals("http://host.docker.internal:8600", tutor.getUri().toString());
     }
 
     @Test

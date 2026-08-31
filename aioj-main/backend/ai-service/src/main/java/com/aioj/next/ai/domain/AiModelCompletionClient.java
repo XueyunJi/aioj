@@ -285,7 +285,9 @@ public class AiModelCompletionClient {
             return false;
         }
         String model = defaultString(config.model()).toLowerCase(Locale.ROOT);
-        return model.startsWith("kimi-k2.5") || model.startsWith("kimi-k2.6");
+        return model.startsWith("kimi-k2.5")
+                || model.startsWith("kimi-k2.6")
+                || model.startsWith("kimi-k3");
     }
 
     private boolean isMoonshotOrKimiRequest(AiModelEffectiveConfig config) {

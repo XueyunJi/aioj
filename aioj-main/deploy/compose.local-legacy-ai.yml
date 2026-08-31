@@ -1,0 +1,12 @@
+services:
+  ai-service:
+    image: aioj-local-ai-service@sha256:3b98931a00cd3f9917b2dae90511a25b3e4bc7461a629771fbb4aa223b994c45
+    pull_policy: never
+    environment:
+      AI_PROBLEM_DRAFT_TESTCASE_ARTIFACT_ROOT: /aioj/ai-draft-artifacts
+    volumes:
+      - ai-draft-artifacts:/aioj/ai-draft-artifacts
+
+volumes:
+  ai-draft-artifacts:
+    name: ai-oj-next_ai-draft-artifacts

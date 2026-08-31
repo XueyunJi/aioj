@@ -1,0 +1,5 @@
+services:
+  ai-service:
+    build:
+      context: ../backend
+      dockerfile: ../deploy/docker/backend.local.Dockerfile

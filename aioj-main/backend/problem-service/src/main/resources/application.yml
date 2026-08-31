@@ -50,6 +50,10 @@ spring:
 aioj:
   internal:
     api-token: ${AIOJ_INTERNAL_API_TOKEN}
+  tutor:
+    enabled: ${TUTOR_INTEGRATION_ENABLED:false}
+    base-url: ${TUTOR_BASE_URL:http://127.0.0.1:8600}
+    webhook-token: ${TUTOR_WEBHOOK_TOKEN:${AIOJ_INTERNAL_API_TOKEN}}
   plagiarism:
     ai-service-uri: ${AI_SERVICE_URI:http://localhost:8204}
     internal-api-token: ${AIOJ_INTERNAL_API_TOKEN}
