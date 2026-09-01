@@ -52,6 +52,7 @@ public class SecurityConfig {
                         .accessDeniedHandler(ApiSecurityExceptionHandlers.accessDeniedHandler()))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/auth/login", "/auth/register", "/auth/refresh", "/auth/logout",
+                                "/auth/handoff/exchange",
                                 "/diagnostics/**", "/actuator/**", "/v3/api-docs/**", "/swagger-ui/**",
                                 "/swagger-ui.html").permitAll()
                         .anyRequest().authenticated())

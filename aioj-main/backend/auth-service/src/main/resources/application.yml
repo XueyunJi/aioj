@@ -37,6 +37,11 @@ aioj:
       max-failures: ${AUTH_LOGIN_MAX_FAILURES:5}
       window: ${AUTH_LOGIN_WINDOW:PT15M}
       lock-duration: ${AUTH_LOGIN_LOCK_DURATION:PT15M}
+    handoff:
+      enabled: ${AIOJ_HANDOFF_ENABLED:false}
+      ttl: ${AIOJ_HANDOFF_TTL:PT60S}
+      max-ttl: ${AIOJ_HANDOFF_MAX_TTL:PT120S}
+      issue-limit-per-minute: ${AIOJ_HANDOFF_ISSUE_LIMIT_PER_MINUTE:20}
   security:
     jwt:
       issuer: ${JWT_ISSUER:ai-oj-next}
