@@ -220,6 +220,11 @@ export interface TokenResponse {
   passwordResetRequired: boolean;
 }
 
+export interface HandoffExchangeResponse {
+  tokens: TokenResponse;
+  nextPath: string;
+}
+
 function isRole(value: unknown): value is Role {
   return value === 'STUDENT' || value === 'TEACHER' || value === 'ADMIN';
 }
@@ -2977,6 +2982,16 @@ async function request<T>(path: string, init: RequestInit = {}, retry = true): P
   }
 }
 
+async function anonymousRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const headers = new Headers(init.headers);
+  headers.delete('Authorization');
+  if (!headers.has('Content-Type') && init.body !== undefined) {
+    headers.set('Content-Type', 'application/json');
+  }
+  const response = await fetch(apiUrl(path), { ...init, headers });
+  return parseResponse<T>(response);
+}
+
 async function requestForm<T>(path: string, formData: FormData, retry = true): Promise<T> {
   const headers = new Headers();
   const snapshot = authStore.snapshot();
@@ -3055,6 +3070,11 @@ export const api = {
     request<TokenResponse>('/api/v1/auth/register', { method: 'POST', body: JSON.stringify(payload) }),
   refresh: () => refreshAccessToken(),
   logout: () => logoutCurrentSession(),
+  exchangeHandoff: (ticket: string) =>
+    anonymousRequest<HandoffExchangeResponse>('/api/v1/auth/handoff/exchange', {
+      method: 'POST',
+      body: JSON.stringify({ ticket })
+    }),
   me: () => request<UserProfileResponse>('/api/v1/users/me'),
   updateMe: (payload: { displayName: string; email?: string }) =>
     request<UserProfileResponse>('/api/v1/users/me', { method: 'PUT', body: JSON.stringify(payload) }),

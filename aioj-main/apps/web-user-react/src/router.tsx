@@ -31,6 +31,7 @@ type SubmissionSearch = { status?: string; problemId?: string; contestId?: strin
 
 const LoginRouteView = lazyRoute(() => import("./views/AuthViews").then((module) => ({ default: module.LoginView })));
 const ForcePasswordChangeRouteView = lazyRoute(() => import("./views/ForcePasswordChangeView").then((module) => ({ default: module.ForcePasswordChangeView })));
+const TutorHandoffRouteView = lazyRoute(() => import("./views/TutorHandoffView").then((module) => ({ default: module.TutorHandoffView })));
 const DashboardRouteView = lazyRoute(() => import("./views/DashboardView").then((module) => ({ default: module.DashboardView })));
 const ProblemsRouteView = lazyRoute(() => import("./views/ProblemsView").then((module) => ({ default: module.ProblemsView })));
 const ProblemDetailRouteView = lazyRoute(() => import("./views/ProblemDetailView").then((module) => ({ default: module.ProblemDetailView })));
@@ -89,6 +90,12 @@ const forcePasswordChangeRoute = createRoute({
     if (!profile?.passwordResetRequired) throw redirect({ to: "/" });
   },
   component: ForcePasswordChangeRouteView
+});
+
+const tutorHandoffRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/auth/tutor-handoff",
+  component: TutorHandoffRouteView
 });
 
 const appRoute = createRoute({
@@ -234,6 +241,7 @@ const profileRoute = createRoute({
 const routeTree = rootRoute.addChildren([
   loginRoute,
   forcePasswordChangeRoute,
+  tutorHandoffRoute,
   appRoute.addChildren([
     dashboardRoute,
     problemsRoute,
