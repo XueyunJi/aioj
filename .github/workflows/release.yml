@@ -20,6 +20,8 @@ jobs:
     runs-on: ubuntu-24.04
     outputs:
       tag: ${{ steps.release.outputs.tag }}
+      matrix: ${{ steps.release.outputs.matrix }}
+      base_tag: ${{ steps.release.outputs.base_tag }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -34,6 +36,13 @@ jobs:
           git fetch origin master
           git merge-base --is-ancestor "$GITHUB_SHA" origin/master
           printf 'tag=%s\n' "$tag" >> "$GITHUB_OUTPUT"
+          if [[ "$tag" == "v0.1.6" ]]; then
+            printf 'base_tag=v0.1.5\n' >> "$GITHUB_OUTPUT"
+            printf 'matrix={"include":[{"service":"web-user","dockerfile":"deploy/docker/web.Dockerfile","build_args":"APP_WORKSPACE=@aioj/web-user-react\\nAPP_DIR=web-user-react\\nVITE_API_BASE_URL=/api"}]}\n' >> "$GITHUB_OUTPUT"
+          else
+            printf 'base_tag=\n' >> "$GITHUB_OUTPUT"
+            printf 'matrix={"include":[{"service":"gateway","dockerfile":"deploy/docker/backend.Dockerfile","build_args":"SERVICE_MODULE=gateway-service"},{"service":"auth","dockerfile":"deploy/docker/backend.Dockerfile","build_args":"SERVICE_MODULE=auth-service"},{"service":"problem","dockerfile":"deploy/docker/backend.Dockerfile","build_args":"SERVICE_MODULE=problem-service"},{"service":"ai","dockerfile":"deploy/docker/backend.Dockerfile","build_args":"SERVICE_MODULE=ai-service"},{"service":"judge-worker","dockerfile":"deploy/docker/backend.Dockerfile","build_args":"SERVICE_MODULE=judge-worker"},{"service":"sandbox","dockerfile":"deploy/sandbox/Dockerfile","build_args":""},{"service":"web-user","dockerfile":"deploy/docker/web.Dockerfile","build_args":"APP_WORKSPACE=@aioj/web-user-react\\nAPP_DIR=web-user-react\\nVITE_API_BASE_URL=/api"},{"service":"web-admin","dockerfile":"deploy/docker/web.Dockerfile","build_args":"APP_WORKSPACE=@aioj/web-admin-react\\nAPP_DIR=web-admin-react\\nVITE_API_BASE_URL=/api"}]}\n' >> "$GITHUB_OUTPUT"
+          fi
 
   build:
     name: Build ${{ matrix.service }}
@@ -41,38 +50,7 @@ jobs:
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - service: gateway
-            dockerfile: deploy/docker/backend.Dockerfile
-            build_args: SERVICE_MODULE=gateway-service
-          - service: auth
-            dockerfile: deploy/docker/backend.Dockerfile
-            build_args: SERVICE_MODULE=auth-service
-          - service: problem
-            dockerfile: deploy/docker/backend.Dockerfile
-            build_args: SERVICE_MODULE=problem-service
-          - service: ai
-            dockerfile: deploy/docker/backend.Dockerfile
-            build_args: SERVICE_MODULE=ai-service
-          - service: judge-worker
-            dockerfile: deploy/docker/backend.Dockerfile
-            build_args: SERVICE_MODULE=judge-worker
-          - service: sandbox
-            dockerfile: deploy/sandbox/Dockerfile
-            build_args: ""
-          - service: web-user
-            dockerfile: deploy/docker/web.Dockerfile
-            build_args: |-
-              APP_WORKSPACE=@aioj/web-user-react
-              APP_DIR=web-user-react
-              VITE_API_BASE_URL=/api
-          - service: web-admin
-            dockerfile: deploy/docker/web.Dockerfile
-            build_args: |-
-              APP_WORKSPACE=@aioj/web-admin-react
-              APP_DIR=web-admin-react
-              VITE_API_BASE_URL=/api
+      matrix: ${{ fromJSON(needs.validate.outputs.matrix) }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -135,6 +113,30 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "24"
+      - name: Load unchanged images from base release
+        if: needs.validate.outputs.base_tag != ''
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BASE_TAG: ${{ needs.validate.outputs.base_tag }}
+        run: |
+          set -Eeuo pipefail
+          mkdir -p manifest-fragments base-release
+          gh release download "$BASE_TAG" \
+            --pattern image-manifest.json \
+            --pattern image-manifest.json.sha256 \
+            --dir base-release
+          (cd base-release && sha256sum --check image-manifest.json.sha256)
+          jq -r '.images | to_entries[] | select(.key != "web-user") | [.key, (.value | split("@")[0]), (.value | split("@")[1])] | @tsv' \
+            base-release/image-manifest.json |
+            while IFS=$'\t' read -r service image digest; do
+              jq -n \
+                --arg service "$service" \
+                --arg image "$image" \
+                --arg digest "$digest" \
+                '{service:$service,image:$image,digest:$digest}' \
+                > "manifest-fragments/$service.json"
+            done
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           pattern: image-*
