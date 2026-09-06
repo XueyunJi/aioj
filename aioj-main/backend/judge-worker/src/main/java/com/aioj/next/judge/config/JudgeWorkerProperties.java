@@ -18,6 +18,12 @@ public class JudgeWorkerProperties {
     private int stdoutExtraCollectBytes = 64 * 1024;
     private int stdoutMaxCollectLimitBytes = 4 * 1024 * 1024;
     private int stderrCollectLimitBytes = 64 * 1024;
+    private long compileMemoryMultiplier = 2L;
+    private long cppCompileMinMemoryKb = 262_144L;
+    private long javaCompileMinMemoryKb = 524_288L;
+    private long checkerCompileMinMemoryKb = 262_144L;
+    private long compileTimeMultiplier = 10L;
+    private long compileMaxTimeMillis = 60_000L;
 
     public String getSandboxEndpoint() {
         return sandboxEndpoint;
@@ -106,4 +112,17 @@ public class JudgeWorkerProperties {
     public void setStderrCollectLimitBytes(int stderrCollectLimitBytes) {
         this.stderrCollectLimitBytes = stderrCollectLimitBytes;
     }
+
+    public long getCompileMemoryMultiplier() { return compileMemoryMultiplier; }
+    public void setCompileMemoryMultiplier(long value) { this.compileMemoryMultiplier = value; }
+    public long getCppCompileMinMemoryKb() { return cppCompileMinMemoryKb; }
+    public void setCppCompileMinMemoryKb(long value) { this.cppCompileMinMemoryKb = value; }
+    public long getJavaCompileMinMemoryKb() { return javaCompileMinMemoryKb; }
+    public void setJavaCompileMinMemoryKb(long value) { this.javaCompileMinMemoryKb = value; }
+    public long getCheckerCompileMinMemoryKb() { return checkerCompileMinMemoryKb; }
+    public void setCheckerCompileMinMemoryKb(long value) { this.checkerCompileMinMemoryKb = value; }
+    public long getCompileTimeMultiplier() { return compileTimeMultiplier; }
+    public void setCompileTimeMultiplier(long value) { this.compileTimeMultiplier = value; }
+    public long getCompileMaxTimeMillis() { return compileMaxTimeMillis; }
+    public void setCompileMaxTimeMillis(long value) { this.compileMaxTimeMillis = value; }
 }

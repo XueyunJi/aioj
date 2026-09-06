@@ -16,6 +16,7 @@ export type SubmissionStatus =
   | 'MEMORY_LIMIT_EXCEEDED'
   | 'OUTPUT_LIMIT_EXCEEDED'
   | 'SYSTEM_ERROR';
+export type JudgePhase = 'COMPILE' | 'RUN' | 'CHECKER';
 
 export interface ApiResponse<T> {
   code: number;
@@ -1149,6 +1150,8 @@ export interface ContestSubmissionResponse {
   emailSnapshot?: string | null;
   language: string;
   status: SubmissionStatus;
+  judgePhase?: JudgePhase | null;
+  sandboxStatus?: string | null;
   judgeMessage: string;
   timeMillis?: number | null;
   memoryKb?: number | null;
@@ -1586,6 +1589,8 @@ export interface SubmissionResponse {
   language: string;
   code?: string | null;
   status: SubmissionStatus;
+  judgePhase?: JudgePhase | null;
+  sandboxStatus?: string | null;
   judgeMessage: string;
   timeMillis?: number;
   memoryKb?: number;
@@ -1612,12 +1617,15 @@ export interface SubmissionCaseResultResponse {
   caseName?: string | null;
   subtaskKey?: string | null;
   status: SubmissionStatus;
+  judgePhase?: JudgePhase | null;
+  sandboxStatus?: string | null;
   score: number;
   maxScore: number;
   timeMillis?: number | null;
   memoryKb?: number | null;
   message?: string | null;
   createdAt: string;
+  sample?: boolean | null;
 }
 
 export interface AiChatMessageResponse {
@@ -1978,6 +1986,7 @@ export interface AiModelListResponse {
   models: AiModelOption[];
 }
 
+export interface JudgeMetricsResponse { started:number; completed:number; failed:number; systemErrors:number; inFlight:number; lastConsumedAt?:string|null; lastError?:string|null; averageQueueWaitMs:number; }
 export interface DailySubmissionStatsResponse {
   date: string;
   totalSubmissions: number;
@@ -3061,6 +3070,7 @@ async function logoutCurrentSession() {
 }
 
 export const api = {
+  judgeMetrics: () => request<JudgeMetricsResponse>('/api/v1/admin/judge/metrics'),
   login: (account: string, password: string) =>
     request<TokenResponse>('/api/v1/auth/login', {
       method: 'POST',

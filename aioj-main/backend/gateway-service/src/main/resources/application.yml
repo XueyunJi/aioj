@@ -56,7 +56,7 @@ spring:
         - id: problem-service
           uri: ${PROBLEM_SERVICE_URI:http://localhost:8202}
           predicates:
-            - Path=/api/v1/problems/**,/api/v1/problem-sets/**,/api/v1/submissions/**,/api/v1/contests/**,/api/v1/notifications/**,/api/v1/admin/submissions/**,/api/v1/admin/operation-jobs/**,/api/v1/admin/audit-events/**
+            - Path=/api/v1/problems/**,/api/v1/problem-sets/**,/api/v1/submissions/**,/api/v1/contests/**,/api/v1/notifications/**,/api/v1/admin/submissions/**,/api/v1/admin/judge/**,/api/v1/admin/operation-jobs/**,/api/v1/admin/audit-events/**
           filters:
             - StripPrefix=2
         - id: ai-service

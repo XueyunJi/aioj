@@ -35,6 +35,7 @@ const ContestsRouteView = lazyRoute(() => import("./views/ContestsView").then((m
 const AiDraftsRouteView = lazyRoute(() => import("./views/AiDraftsView").then((module) => ({ default: module.AiDraftsView })));
 const AiModelConfigsRouteView = lazyRoute(() => import("./views/AiModelConfigsView").then((module) => ({ default: module.AiModelConfigsView })));
 const OperationAuditRouteView = lazyRoute(() => import("./views/OperationAuditView").then((module) => ({ default: module.OperationAuditView })));
+const JudgeMetricsRouteView = lazyRoute(() => import("./views/JudgeMetricsView").then((module) => ({ default: module.JudgeMetricsView })));
 
 const rootRoute = createRootRouteWithContext<RouterContext>()({
   component: Outlet
@@ -221,12 +222,13 @@ const operationsRoute = createRoute({
   beforeLoad: requireRoles(ADMIN_APP_ROLES),
   component: OperationAuditRouteView
 });
+const judgeMetricsRoute = createRoute({ getParentRoute: () => appRoute, path: "/judge-metrics", beforeLoad: requireRoles(ADMIN_APP_ROLES), component: JudgeMetricsRouteView });
 
 const routeTree = rootRoute.addChildren([
   loginRoute,
   forcePasswordChangeRoute,
   blockedRoute,
-  appRoute.addChildren([indexRoute, dashboardRoute, usersRoute, rolesRoute, classesRoute, problemsRoute, contestsRoute, aiDraftsRoute, aiDraftJobsRoute, aiModelConfigsRoute, operationsRoute])
+  appRoute.addChildren([indexRoute, dashboardRoute, usersRoute, rolesRoute, classesRoute, problemsRoute, contestsRoute, aiDraftsRoute, aiDraftJobsRoute, aiModelConfigsRoute, operationsRoute, judgeMetricsRoute])
 ]);
 
 export const router = createRouter({

@@ -51,11 +51,15 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class SubmissionService {
     private static final Logger log = LoggerFactory.getLogger(SubmissionService.class);
     private static final Set<String> SUPPORTED_LANGUAGES = Set.of("java", "cpp", "python");
+    private static final int SUBMISSION_RATE_LIMIT = 30;
+    private static final long SUBMISSION_RATE_WINDOW_SECONDS = 60;
+    private final ConcurrentHashMap<Long, RateWindow> submissionRateWindows = new ConcurrentHashMap<>();
     private static final ZoneId ZONE = ZoneId.systemDefault();
 
     private final ProblemCatalog problemCatalog;
@@ -125,6 +129,7 @@ public class SubmissionService {
                 return toResponse(existing, false, false);
             }
         }
+        enforceSubmissionRateLimit(userId, now);
         SubmissionEntity submission = new SubmissionEntity();
         submission.setProblemId(request.problemId());
         submission.setUserId(userId);
@@ -158,6 +163,22 @@ public class SubmissionService {
                 language, TraceIds.current(), effectiveTimeLimitMillis, memoryLimitKb));
         return toResponse(submission, false, false);
     }
+
+    private void enforceSubmissionRateLimit(Long userId, Instant now) {
+        RateWindow updated = submissionRateWindows.compute(userId, (key, current) -> {
+            long epoch = now.getEpochSecond();
+            if (current == null || epoch - current.windowStart >= SUBMISSION_RATE_WINDOW_SECONDS) {
+                return new RateWindow(epoch, 1);
+            }
+            return new RateWindow(current.windowStart, current.count + 1);
+        });
+        if (updated.count > SUBMISSION_RATE_LIMIT) {
+            throw new DomainException(ErrorCode.TOO_MANY_REQUESTS,
+                    "Submission rate limit exceeded; please wait before submitting again");
+        }
+    }
+
+    private record RateWindow(long windowStart, int count) {}
 
     public SubmissionResponse get(Long id) {
         SubmissionEntity submission = submissionMapper.selectById(id);
@@ -411,7 +432,8 @@ public class SubmissionService {
                 submission.getContestId(), submission.getContestRunId(), submission.getContestProblemId(), submission.getContestParticipantId(),
                 submission.getSubmittedAtContestMillis(), !Boolean.FALSE.equals(submission.getVisibleToParticipant()),
                 submission.getLanguage(), includeCode ? submission.getCode() : null,
-                submission.getStatus(), submission.getJudgeMessage(),
+                submission.getStatus(), submission.getJudgePhase(), submission.getSandboxStatus(),
+                submission.getJudgeMessage(),
                 submission.getTimeMillis(), submission.getMemoryKb(),
                 includeCode ? submission.getStdoutExcerpt() : null,
                 includeCode ? submission.getStderrExcerpt() : null,
@@ -431,9 +453,10 @@ public class SubmissionService {
                 .map(result -> new SubmissionCaseResultResponse(result.getId(), result.getSubmissionId(),
                         result.getContestId(), result.getContestProblemId(), result.getContestParticipantId(),
                         result.getTestcasePackageId(), result.getCaseId(), result.getCaseIndex(),
-                        result.getCaseName(), result.getSubtaskKey(), result.getStatus(), result.getScore(),
+                        result.getCaseName(), result.getSubtaskKey(), result.getStatus(),
+                        result.getJudgePhase(), result.getSandboxStatus(), result.getScore(),
                         result.getMaxScore(), result.getTimeMillis(), result.getMemoryKb(), result.getMessage(),
-                        result.getCreatedAt()))
+                        result.getCreatedAt(), result.getSample()))
                 .toList();
     }
 

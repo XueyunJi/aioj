@@ -1,6 +1,7 @@
 package com.aioj.next.problem.persistence.entity;
 
 import com.aioj.next.contract.submission.SubmissionStatus;
+import com.aioj.next.contract.submission.JudgePhase;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
@@ -23,6 +24,8 @@ public class SubmissionEntity {
     private String language;
     private String code;
     private SubmissionStatus status;
+    private JudgePhase judgePhase;
+    private String sandboxStatus;
     private String judgeMessage;
     private Long timeMillis;
     private Long memoryKb;
@@ -133,6 +136,11 @@ public class SubmissionEntity {
     public void setStatus(SubmissionStatus status) {
         this.status = status;
     }
+
+    public JudgePhase getJudgePhase() { return judgePhase; }
+    public void setJudgePhase(JudgePhase judgePhase) { this.judgePhase = judgePhase; }
+    public String getSandboxStatus() { return sandboxStatus; }
+    public void setSandboxStatus(String sandboxStatus) { this.sandboxStatus = sandboxStatus; }
 
     public String getJudgeMessage() {
         return judgeMessage;

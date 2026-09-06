@@ -71,12 +71,12 @@ public class SandboxExecutionClient {
         Long runTimeMs = nanosToMillis(result.runTime());
         String stderr = fileContent(result, "stderr");
         if (!"Accepted".equals(result.status())) {
-            return CompileOutcome.failed(firstText(stderr, result.error(), result.status()), timeMs, memoryKb,
+            return CompileOutcome.failed(result.status(), firstText(stderr, result.error(), result.status()), timeMs, memoryKb,
                     stderr, result.exitStatus(), runTimeMs);
         }
         String fileId = result.fileIds() == null ? null : result.fileIds().get(lang.executableName());
         if (!StringUtils.hasText(fileId)) {
-            return CompileOutcome.failed("Compile succeeded but sandbox did not return cached fileId",
+            return CompileOutcome.failed("Internal Error", "Compile succeeded but sandbox did not return cached fileId",
                     timeMs, memoryKb, stderr, result.exitStatus(), runTimeMs);
         }
         return CompileOutcome.success(fileId, timeMs, memoryKb, stderr, result.exitStatus(), runTimeMs);
@@ -759,6 +759,7 @@ public class SandboxExecutionClient {
     }
 
     public record CompileOutcome(boolean failed,
+                                 String sandboxStatus,
                                  String fileId,
                                  String message,
                                  Long timeMillis,
@@ -766,15 +767,21 @@ public class SandboxExecutionClient {
                                  String stderr,
                                  Integer exitStatus,
                                  Long runTimeMillis) {
-        static CompileOutcome success(String fileId, Long timeMillis, Long memoryKb, String stderr,
-                                      Integer exitStatus, Long runTimeMillis) {
-            return new CompileOutcome(false, fileId, "Accepted", timeMillis, memoryKb, stderr,
+        public CompileOutcome(boolean failed, String fileId, String message, Long timeMillis, Long memoryKb,
+                              String stderr, Integer exitStatus, Long runTimeMillis) {
+            this(failed, failed ? null : "Accepted", fileId, message, timeMillis, memoryKb, stderr,
                     exitStatus, runTimeMillis);
         }
 
-        static CompileOutcome failed(String message, Long timeMillis, Long memoryKb, String stderr,
+        static CompileOutcome success(String fileId, Long timeMillis, Long memoryKb, String stderr,
+                                      Integer exitStatus, Long runTimeMillis) {
+            return new CompileOutcome(false, "Accepted", fileId, "Accepted", timeMillis, memoryKb, stderr,
+                    exitStatus, runTimeMillis);
+        }
+
+        static CompileOutcome failed(String sandboxStatus, String message, Long timeMillis, Long memoryKb, String stderr,
                                      Integer exitStatus, Long runTimeMillis) {
-            return new CompileOutcome(true, null, message, timeMillis, memoryKb, stderr,
+            return new CompileOutcome(true, sandboxStatus, null, message, timeMillis, memoryKb, stderr,
                     exitStatus, runTimeMillis);
         }
     }

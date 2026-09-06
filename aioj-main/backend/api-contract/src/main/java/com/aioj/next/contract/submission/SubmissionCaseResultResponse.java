@@ -24,6 +24,10 @@ public record SubmissionCaseResultResponse(
         @JsonInclude(JsonInclude.Include.NON_NULL)
         String subtaskKey,
         SubmissionStatus status,
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        JudgePhase judgePhase,
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        String sandboxStatus,
         BigDecimal score,
         BigDecimal maxScore,
         @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -32,6 +36,17 @@ public record SubmissionCaseResultResponse(
         Long memoryKb,
         @JsonInclude(JsonInclude.Include.NON_NULL)
         String message,
-        Instant createdAt
+        Instant createdAt,
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        Boolean sample
 ) {
+    public SubmissionCaseResultResponse(Long id, Long submissionId, Long contestId, Long contestProblemId,
+                                        Long contestParticipantId, Long testcasePackageId, Long caseId,
+                                        int caseIndex, String caseName, String subtaskKey, SubmissionStatus status,
+                                        BigDecimal score, BigDecimal maxScore, Long timeMillis, Long memoryKb,
+                                        String message, Instant createdAt) {
+        this(id, submissionId, contestId, contestProblemId, contestParticipantId, testcasePackageId, caseId,
+                caseIndex, caseName, subtaskKey, status, null, null, score, maxScore, timeMillis, memoryKb,
+                message, createdAt, null);
+    }
 }

@@ -56,7 +56,8 @@ public class SubmissionJudgingService {
         validateTask(task);
         SubmissionEntity update = new SubmissionEntity();
         update.setStatus(SubmissionStatus.RUNNING);
-        update.setJudgeMessage("Judging started");
+        update.setJudgePhase(com.aioj.next.contract.submission.JudgePhase.COMPILE);
+        update.setJudgeMessage("Compiling submission");
         update.setUpdatedAt(Instant.now());
         int updated = submissionMapper.update(update, new LambdaUpdateWrapper<SubmissionEntity>()
                 .eq(SubmissionEntity::getId, task.submissionId())
@@ -78,11 +79,24 @@ public class SubmissionJudgingService {
     }
 
     @Transactional
+    public void markRunningPhase(Long submissionId) {
+        SubmissionEntity update = new SubmissionEntity();
+        update.setJudgePhase(com.aioj.next.contract.submission.JudgePhase.RUN);
+        update.setJudgeMessage("Running test cases");
+        update.setUpdatedAt(Instant.now());
+        submissionMapper.update(update, new LambdaUpdateWrapper<SubmissionEntity>()
+                .eq(SubmissionEntity::getId, submissionId)
+                .eq(SubmissionEntity::getStatus, SubmissionStatus.RUNNING));
+    }
+
+    @Transactional
     public boolean finish(JudgeTaskMessage task, JudgeResult result) {
         SubmissionStatus status = result.status();
         Instant judgedAt = result.judgedAt() == null ? Instant.now() : result.judgedAt();
         SubmissionEntity update = new SubmissionEntity();
         update.setStatus(status);
+        update.setJudgePhase(result.phase());
+        update.setSandboxStatus(result.sandboxStatus());
         update.setJudgeMessage(truncate(result.message()));
         update.setTimeMillis(result.timeMillis());
         update.setMemoryKb(result.memoryKb());
@@ -101,7 +115,8 @@ public class SubmissionJudgingService {
             rewriteCaseResults(task, result, judgedAt);
             Integer signalValue = status == SubmissionStatus.RUNTIME_ERROR
                     && "Signalled".equals(result.message()) ? result.exitStatus() : null;
-            audit(task.submissionId(), SubmissionStatus.RUNNING, status, result.message(), signalValue, null);
+            audit(task.submissionId(), SubmissionStatus.RUNNING, status, result.message(), signalValue, null,
+                    result.phase(), result.sandboxStatus());
             notifyJudgedAfterCommit(task, status, judgedAt);
             return true;
         }
@@ -156,11 +171,19 @@ public class SubmissionJudgingService {
 
     private void audit(Long submissionId, SubmissionStatus fromStatus, SubmissionStatus toStatus, String message,
                        Integer signalValue, String sandboxRunId) {
+        audit(submissionId, fromStatus, toStatus, message, signalValue, sandboxRunId, null, null);
+    }
+
+    private void audit(Long submissionId, SubmissionStatus fromStatus, SubmissionStatus toStatus, String message,
+                       Integer signalValue, String sandboxRunId,
+                       com.aioj.next.contract.submission.JudgePhase phase, String sandboxStatus) {
         try {
             JudgeAuditLogEntity audit = new JudgeAuditLogEntity();
             audit.setSubmissionId(submissionId);
             audit.setFromStatus(fromStatus);
             audit.setToStatus(toStatus);
+            audit.setJudgePhase(phase);
+            audit.setSandboxStatus(sandboxStatus);
             audit.setWorkerId(workerId);
             audit.setMessage(truncate(message));
             audit.setSignalValue(signalValue);
@@ -220,6 +243,9 @@ public class SubmissionJudgingService {
             entity.setCaseName(truncateCaseName(caseResult.caseName()));
             entity.setSubtaskKey(caseResult.subtaskKey());
             entity.setStatus(caseResult.status());
+            entity.setJudgePhase(caseResult.phase());
+            entity.setSandboxStatus(caseResult.sandboxStatus());
+            entity.setSample(caseResult.sample());
             entity.setScore(caseResult.score());
             entity.setMaxScore(caseResult.maxScore());
             entity.setTimeMillis(caseResult.timeMillis());

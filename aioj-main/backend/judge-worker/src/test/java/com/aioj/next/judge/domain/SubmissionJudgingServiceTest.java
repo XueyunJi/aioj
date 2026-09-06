@@ -3,6 +3,7 @@ package com.aioj.next.judge.domain;
 import com.aioj.next.contract.ai.AiJudgedSubmissionEventRequest;
 import com.aioj.next.contract.judge.JudgeTaskMessage;
 import com.aioj.next.contract.submission.SubmissionStatus;
+import com.aioj.next.contract.submission.JudgePhase;
 import com.aioj.next.judge.config.JudgeWorkerProperties;
 import com.aioj.next.judge.persistence.entity.JudgeAuditLogEntity;
 import com.aioj.next.judge.persistence.entity.SubmissionEntity;
@@ -62,12 +63,22 @@ class SubmissionJudgingServiceTest {
                 null,
                 null,
                 List.of()
-        );
+        ).withDiagnostics(JudgePhase.RUN, "Accepted");
         TransactionSynchronizationManager.initSynchronization();
 
         boolean updated = service.finish(task, result);
 
         assertThat(updated).isTrue();
+        ArgumentCaptor<SubmissionEntity> updateCaptor = ArgumentCaptor.forClass(SubmissionEntity.class);
+        verify(submissionMapper).update(updateCaptor.capture(), any());
+        assertThat(updateCaptor.getValue().getJudgePhase()).isEqualTo(JudgePhase.RUN);
+        assertThat(updateCaptor.getValue().getSandboxStatus()).isEqualTo("Accepted");
+        ArgumentCaptor<JudgeAuditLogEntity> auditCaptor = ArgumentCaptor.forClass(JudgeAuditLogEntity.class);
+        verify(auditLogMapper).insert(auditCaptor.capture());
+        assertThat(auditCaptor.getAllValues()).anySatisfy(audit -> {
+            assertThat(audit.getJudgePhase()).isEqualTo(JudgePhase.RUN);
+            assertThat(audit.getSandboxStatus()).isEqualTo("Accepted");
+        });
         verify(eventClient, never()).notifyJudgedSubmission(any());
         for (TransactionSynchronization synchronization : TransactionSynchronizationManager.getSynchronizations()) {
             synchronization.afterCommit();

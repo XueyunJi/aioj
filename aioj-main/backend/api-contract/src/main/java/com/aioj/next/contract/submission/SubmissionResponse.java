@@ -25,6 +25,10 @@ public record SubmissionResponse(
         @JsonInclude(JsonInclude.Include.NON_NULL)
         String code,
         SubmissionStatus status,
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        JudgePhase judgePhase,
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        String sandboxStatus,
         String judgeMessage,
         Long timeMillis,
         Long memoryKb,

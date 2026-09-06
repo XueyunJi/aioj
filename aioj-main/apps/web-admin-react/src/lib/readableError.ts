@@ -37,5 +37,24 @@ export function readableJudgeMessage(
   if (!value?.trim()) {
     return fallbackStatus;
   }
+  if (locale === "zh-CN") {
+    return localizeJudgeDetail(value);
+  }
   return value;
+}
+
+function localizeJudgeDetail(value: string) {
+  return value
+    .replace(/^Compile phase:/, "编译阶段：")
+    .replace(/^Run phase:/, "运行阶段：")
+    .replace(/^Checker phase:/, "校验器阶段：")
+    .replace("Memory Limit Exceeded", "内存超限")
+    .replace("Time Limit Exceeded", "时间超限")
+    .replace("Output Limit Exceeded", "输出超限")
+    .replace("SIGSEGV", "段错误 SIGSEGV")
+    .replace("SIGFPE", "算术异常 SIGFPE")
+    .replace("SIGABRT", "程序中止 SIGABRT")
+    .replace("SIGKILL", "被强制终止 SIGKILL")
+    .replace("SIGPIPE", "管道错误 SIGPIPE")
+    .replace("SIGTERM", "被终止 SIGTERM");
 }

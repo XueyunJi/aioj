@@ -102,13 +102,21 @@ export function SubmissionDetailDialog({
                 <div className="grid gap-3 md:grid-cols-2">
                   <Detail label={t("submissions.viewProblemLabel")} value={submissionProblemTitle ?? `#${submission.problemId}`} />
                   <Detail label={t("submissions.viewLanguageLabel")} value={submission.language} />
-                  <StatusDetail label={t("submissions.viewStatusLabel")} status={submission.status} value={t(`submissionStatus.${submission.status}`)} />
+                  <StatusDetail label={t("submissions.viewStatusLabel")} status={submission.status} value={submissionStatusLabel(submission.status, submission.judgePhase, t(`submissionStatus.${submission.status}`), locale)} />
                   <Detail label={t("submissions.viewMemoryLabel")} value={formatMemory(submission.memoryKb)} />
                   <Detail label={t("submissions.viewRunTimeLabel")} value={submission.runTimeMillis ? `${submission.runTimeMillis} ms` : "--"} />
                   <Detail label={t("submissions.viewExitStatusLabel")} value={submission.exitStatus ?? "--"} />
                   <Detail label={t("contests.maxScore")} value={formatScoreSummary(submission.score, submission.maxScore)} />
                 </div>
-                {submission.caseResults?.length ? <SubmissionCaseResultsTable caseResults={submission.caseResults} /> : null}
+                {submission.caseResults?.length ? <>
+                  <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-950">
+                    {t("contests.caseResults")}: {submission.caseResults.filter((item) => item.status === "ACCEPTED").length} / {submission.caseResults.length}
+                    <span className="mx-2 font-normal text-emerald-800">·</span>
+                    <span className="font-normal text-emerald-800">得分 {formatScoreSummary(submission.score, submission.maxScore)}</span>
+                    {submission.judgePhase === "CHECKER" ? <div className="mt-1 text-xs font-normal text-amber-800">结果由自定义校验器判定；若校验器异常，平台会单独标注校验器阶段。</div> : null}
+                  </div>
+                  <SubmissionCaseResultsTable caseResults={submission.caseResults} />
+                </> : null}
                 {submission.code ? (
                   <div className="overflow-hidden rounded-xl border border-[var(--oj-border-soft)] bg-white">
                     <div className="flex items-center justify-between gap-3 border-b border-[var(--oj-border-soft)] px-3 py-2">
@@ -201,6 +209,14 @@ function StatusDetail({ label, status, value }: { label: string; status: Submiss
   );
 }
 
+function submissionStatusLabel(status: SubmissionStatus, phase: string | null | undefined, fallback: string, locale: string) {
+  if (!phase) return fallback;
+  const phaseLabel = locale === "zh-CN"
+    ? ({ COMPILE: "编译阶段", RUN: "运行阶段", CHECKER: "校验器阶段" } as const)[phase as "COMPILE" | "RUN" | "CHECKER"]
+    : ({ COMPILE: "compile phase", RUN: "run phase", CHECKER: "checker phase" } as const)[phase as "COMPILE" | "RUN" | "CHECKER"];
+  return phaseLabel ? `${fallback}（${phaseLabel}）` : fallback;
+}
+
 function submissionAnalysisPromptKey(status: SubmissionStatus) {
   switch (status) {
     case "ACCEPTED":
@@ -236,10 +252,23 @@ function OutputBlock({ label, value }: { label: string; value: string }) {
 function SubmissionCaseResultsTable({ caseResults }: { caseResults: NonNullable<SubmissionResponse["caseResults"]> }) {
   const { t } = useI18n();
   const sorted = [...caseResults].sort((left, right) => left.caseIndex - right.caseIndex);
+  const samples = sorted.filter((item) => item.sample === true);
+  const hidden = sorted.filter((item) => item.sample !== true);
+  const statusCounts = sorted.reduce<Record<string, number>>((counts, item) => {
+    counts[item.status] = (counts[item.status] ?? 0) + 1;
+    return counts;
+  }, {});
   return (
     <section className="overflow-hidden rounded-xl border border-[var(--oj-border-soft)] bg-white">
       <div className="border-b border-[var(--oj-border-soft)] px-3 py-2">
         <h4 className="text-sm font-semibold text-[var(--oj-ink)]">{t("contests.caseResults")}</h4>
+      </div>
+      <div className="px-3 py-2 text-xs text-[var(--oj-ink-muted)]">
+        公开样例：{samples.filter((item) => item.status === "ACCEPTED").length} / {samples.length || 0}
+        <span className="mx-2">·</span>
+        隐藏测试点：{hidden.filter((item) => item.status === "ACCEPTED").length} / {hidden.length}
+        {samples.length === 0 ? <div className="mt-1 text-amber-700">当前官方测试包不包含公开样例，公开样例仅供本地测试使用。</div> : null}
+        <div className="mt-1">结果分布：{Object.entries(statusCounts).map(([status, count]) => `${statusLabel(status)} ${count}`).join(" · ")}</div>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[620px] text-sm">
@@ -272,6 +301,20 @@ function SubmissionCaseResultsTable({ caseResults }: { caseResults: NonNullable<
       </div>
     </section>
   );
+}
+
+function statusLabel(status: string) {
+  const labels: Record<string, string> = {
+    ACCEPTED: "通过",
+    WRONG_ANSWER: "答案错误",
+    TIME_LIMIT_EXCEEDED: "超时",
+    MEMORY_LIMIT_EXCEEDED: "内存超限",
+    RUNTIME_ERROR: "运行错误",
+    COMPILE_ERROR: "编译错误",
+    OUTPUT_LIMIT_EXCEEDED: "输出超限",
+    SYSTEM_ERROR: "系统错误"
+  };
+  return labels[status] ?? status;
 }
 
 function codeToMarkdown(code: string, language: string) {

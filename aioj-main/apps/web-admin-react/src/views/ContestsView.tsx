@@ -4917,6 +4917,7 @@ function ContestSubmissionDetail({
         </div>
       )}
       {submission.stderrExcerpt ? <OutputBlock label={t("submissions.viewStderrLabel")} value={submission.stderrExcerpt} /> : null}
+      {submission.judgePhase ? <OutputBlock label="判题阶段" value={submission.judgePhase === "COMPILE" ? "编译阶段" : submission.judgePhase === "RUN" ? "运行阶段" : "校验器阶段"} /> : null}
       <OutputBlock label={t("submissions.viewJudgeMessage")} value={readableJudgeMessage(submission.judgeMessage, submission.status, locale, t(`submissionStatus.${submission.status}`))} />
     </aside>
   );

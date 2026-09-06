@@ -8,6 +8,7 @@ import com.aioj.next.judge.domain.SandboxClient;
 import com.aioj.next.judge.domain.SubmissionJudgingService;
 import com.aioj.next.judge.domain.TestcasePackageCache;
 import com.aioj.next.judge.domain.TestcasePackageUnavailableException;
+import com.aioj.next.judge.monitor.JudgeRuntimeMonitor;
 import com.rabbitmq.client.Channel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,12 +26,14 @@ public class JudgeTaskListener {
     private final SandboxClient sandboxClient;
     private final SubmissionJudgingService judgingService;
     private final TestcasePackageCache testcasePackageCache;
+    private final JudgeRuntimeMonitor runtimeMonitor;
 
     public JudgeTaskListener(SandboxClient sandboxClient, SubmissionJudgingService judgingService,
-                             TestcasePackageCache testcasePackageCache) {
+                             TestcasePackageCache testcasePackageCache, JudgeRuntimeMonitor runtimeMonitor) {
         this.sandboxClient = sandboxClient;
         this.judgingService = judgingService;
         this.testcasePackageCache = testcasePackageCache;
+        this.runtimeMonitor = runtimeMonitor;
     }
 
     @RabbitListener(queues = JudgeQueueConfig.JUDGE_QUEUE)
@@ -47,6 +50,7 @@ public class JudgeTaskListener {
             }
             log.info("Judge task started submission={} problem={} queueWaitMs={}",
                     task.submissionId(), task.problemId(), queueWaitMs);
+            runtimeMonitor.recordStarted(queueWaitMs);
             try {
                 testcasePackageCache.prepareActivePackage(task.problemId())
                         .ifPresent(testcasePackage -> log.info("Prepared testcase package submission={} package={} cases={}",
@@ -59,6 +63,7 @@ public class JudgeTaskListener {
                 channel.basicAck(deliveryTag, false);
                 return;
             }
+            judgingService.markRunningPhase(task.submissionId());
             var result = sandboxClient.judge(task);
             judgingService.finish(task, result);
             log.info("submission={} problem={} status={} time={}ms memory={}kb queueWaitMs={} judgeWallMs={}",
@@ -66,16 +71,20 @@ public class JudgeTaskListener {
                     queueWaitMs, elapsedMillis(startedNanos));
             log.info("Acking judged submission={}", task.submissionId());
             channel.basicAck(deliveryTag, false);
+            runtimeMonitor.recordCompleted(result.status().name());
         } catch (NonRetryableJudgeTaskException ex) {
             Long submissionId = task == null ? null : task.submissionId();
             log.warn("Rejecting non-retryable judge task submission={} queueWaitMs={} judgeWallMs={}: {}",
                     submissionId, queueWaitMs, elapsedMillis(startedNanos), ex.getMessage());
             judgingService.markSystemError(submissionId, ex.getMessage());
             channel.basicNack(deliveryTag, false, false);
+            runtimeMonitor.recordFailure(ex);
         } catch (Exception ex) {
             Long submissionId = task == null ? null : task.submissionId();
-            log.error("Judge failed for submission={} queueWaitMs={} judgeWallMs={}; sending to DLQ",
-                    submissionId, queueWaitMs, elapsedMillis(startedNanos), ex);
+            log.error("Judge failed submission={} problem={} user={} language={} queueWaitMs={} judgeWallMs={} errorType={} message={}; sending to DLQ",
+                    submissionId, task == null ? null : task.problemId(), task == null ? null : task.userId(),
+                    task == null ? null : task.language(), queueWaitMs, elapsedMillis(startedNanos),
+                    ex.getClass().getSimpleName(), ex.getMessage(), ex);
             channel.basicNack(deliveryTag, false, false);
         }
     }

@@ -1,6 +1,7 @@
 package com.aioj.next.judge.persistence.entity;
 
 import com.aioj.next.contract.submission.SubmissionStatus;
+import com.aioj.next.contract.submission.JudgePhase;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
@@ -14,6 +15,8 @@ public class JudgeAuditLogEntity {
     private Long submissionId;
     private SubmissionStatus fromStatus;
     private SubmissionStatus toStatus;
+    private JudgePhase judgePhase;
+    private String sandboxStatus;
     private String workerId;
     private String message;
     private String sandboxRunId;
@@ -51,6 +54,11 @@ public class JudgeAuditLogEntity {
     public void setToStatus(SubmissionStatus toStatus) {
         this.toStatus = toStatus;
     }
+
+    public JudgePhase getJudgePhase() { return judgePhase; }
+    public void setJudgePhase(JudgePhase judgePhase) { this.judgePhase = judgePhase; }
+    public String getSandboxStatus() { return sandboxStatus; }
+    public void setSandboxStatus(String sandboxStatus) { this.sandboxStatus = sandboxStatus; }
 
     public String getWorkerId() {
         return workerId;

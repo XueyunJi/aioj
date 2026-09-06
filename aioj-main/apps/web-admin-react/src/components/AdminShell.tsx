@@ -20,7 +20,7 @@ const navIcons = {
 
 const ADMIN_APP_ROLES: readonly Role[] = ["TEACHER", "ADMIN"];
 const ADMIN_ONLY_ROLES: readonly Role[] = ["ADMIN"];
-type AdminNavHref = "/dashboard" | "/users" | "/roles" | "/classes" | "/problems" | "/contests" | "/ai-drafts" | "/ai-model-configs" | "/operations";
+type AdminNavHref = "/dashboard" | "/users" | "/roles" | "/classes" | "/problems" | "/contests" | "/ai-drafts" | "/ai-model-configs" | "/operations" | "/judge-metrics";
 type AdminNavItem = {
   label: string;
   href: AdminNavHref;
@@ -48,6 +48,7 @@ export function AdminShell() {
     adminNavItem({ label: t("nav.aiDrafts"), href: "/ai-drafts", icon: "drafts", roles: ADMIN_APP_ROLES }),
     adminNavItem({ label: t("nav.aiModelConfigs"), href: "/ai-model-configs", icon: "aiConfig", roles: ADMIN_ONLY_ROLES }),
     adminNavItem({ label: t("nav.operations"), href: "/operations", icon: "operations", roles: ADMIN_APP_ROLES })
+    ,adminNavItem({ label: "判题监控", href: "/judge-metrics", icon: "operations", roles: ADMIN_APP_ROLES })
   ].filter((item) => auth.hasAnyRole(item.roles));
   const userInitial = (auth.displayName || t("shell.adminFallback")).trim().slice(0, 1).toUpperCase();
   const roleLabel = auth.isAdmin ? t("role.ADMIN") : auth.isTeacher ? t("role.TEACHER") : t("role.STUDENT");

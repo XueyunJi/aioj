@@ -53,6 +53,12 @@ aioj:
     stdout-extra-collect-bytes: ${JUDGE_STDOUT_EXTRA_COLLECT_BYTES:65536}
     stdout-max-collect-limit-bytes: ${JUDGE_STDOUT_MAX_COLLECT_LIMIT_BYTES:4194304}
     stderr-collect-limit-bytes: ${JUDGE_STDERR_COLLECT_LIMIT_BYTES:65536}
+    compile-memory-multiplier: ${JUDGE_COMPILE_MEMORY_MULTIPLIER:2}
+    cpp-compile-min-memory-kb: ${JUDGE_CPP_COMPILE_MIN_MEMORY_KB:262144}
+    java-compile-min-memory-kb: ${JUDGE_JAVA_COMPILE_MIN_MEMORY_KB:524288}
+    checker-compile-min-memory-kb: ${JUDGE_CHECKER_COMPILE_MIN_MEMORY_KB:262144}
+    compile-time-multiplier: ${JUDGE_COMPILE_TIME_MULTIPLIER:10}
+    compile-max-time-millis: ${JUDGE_COMPILE_MAX_TIME_MILLIS:60000}
 
 management:
   endpoints:

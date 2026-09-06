@@ -205,7 +205,8 @@ public class ContestSubmissionAccessService {
                 participant == null ? "#" + submission.getUserId() : participant.getAccountSnapshot(),
                 participant == null ? "#" + submission.getUserId() : participant.getDisplayNameSnapshot(),
                 participant == null ? null : participant.getEmailSnapshot(),
-                submission.getLanguage(), submission.getStatus(), submission.getJudgeMessage(), submission.getTimeMillis(),
+                submission.getLanguage(), submission.getStatus(), submission.getJudgePhase(),
+                submission.getSandboxStatus(), submission.getJudgeMessage(), submission.getTimeMillis(),
                 submission.getMemoryKb(), submission.getScore(), submission.getMaxScore(),
                 includeCaseResults ? caseResults(submission.getId()) : null,
                 submission.getSubmittedAtContestMillis(), submission.getCreatedAt(),
@@ -225,9 +226,10 @@ public class ContestSubmissionAccessService {
                 .map(result -> new SubmissionCaseResultResponse(result.getId(), result.getSubmissionId(),
                         result.getContestId(), result.getContestProblemId(), result.getContestParticipantId(),
                         result.getTestcasePackageId(), result.getCaseId(), result.getCaseIndex(),
-                        result.getCaseName(), result.getSubtaskKey(), result.getStatus(), result.getScore(),
+                        result.getCaseName(), result.getSubtaskKey(), result.getStatus(),
+                        result.getJudgePhase(), result.getSandboxStatus(), result.getScore(),
                         result.getMaxScore(), result.getTimeMillis(), result.getMemoryKb(), result.getMessage(),
-                        result.getCreatedAt()))
+                        result.getCreatedAt(), result.getSample()))
                 .toList();
     }
 
