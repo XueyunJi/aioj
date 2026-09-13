@@ -16,7 +16,7 @@ services:
   mysql:
     image: mysql:8.4@sha256:1d6b6a8fcee8ff758ff151d017f5203cd06792a0e698f0a593c9dfcb14609cf0
     restart: unless-stopped
-    command: --innodb-buffer-pool-size=768M --max-connections=100
+    command: --innodb-buffer-pool-size=384M --max-connections=100
     environment:
       MYSQL_DATABASE: ${MYSQL_DATABASE:?MYSQL_DATABASE is required}
       MYSQL_USER: ${MYSQL_USER:?MYSQL_USER is required}
